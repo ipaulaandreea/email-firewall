@@ -12,7 +12,7 @@ out/
 
 *.log
 
-.env
+backend/.env
 application-local.properties
 application-dev.properties
 

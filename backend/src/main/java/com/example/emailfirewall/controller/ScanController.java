@@ -1,4 +1,4 @@
-package com.example.emailfirewall.api;
+package com.example.emailfirewall.controller;
 
 import org.springframework.web.bind.annotation.*;
 
