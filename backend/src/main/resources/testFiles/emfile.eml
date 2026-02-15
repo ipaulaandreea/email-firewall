@@ -1,0 +1,11 @@
+From: Alice <alice@example.com>
+To: Bob <bob@example.com>
+Subject: Test EML Simplu
+Date: Sun, 15 Feb 2026 10:00:00 +0200
+Message-ID: <test-simple-001@example.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+
+Salut!
+Acesta este un email de test in format EML, plain text.
+Multumesc!
