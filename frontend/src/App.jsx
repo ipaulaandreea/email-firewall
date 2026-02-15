@@ -1,42 +1,38 @@
-import { useState } from 'react'
-import './App.css'
+import { NavLink, Route, Routes, Navigate } from "react-router-dom";
+import IngestionPage from "./pages/IngestionPage.jsx";
 
-function App() {
-    const [result, setResult] = useState(null)
-
-    const handleScan = async () => {
-        try {
-            const response = await fetch('/api/scan', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    subject: 'Test',
-                    body: 'Hello'
-                })
-            })
-
-            const data = await response.json()
-            setResult(data)
-        } catch (error) {
-            console.error("Error:", error)
-        }
-    }
-
+export default function App() {
     return (
-        <div style={{ padding: 20 }}>
-            <h1>Email Firewall</h1>
+        <div className="appShell">
+            <aside className="sidebar">
+                <div className="brand">
+                    <div className="brandTitle">Email Firewall</div>
+                    <div className="brandSub">Admin Console</div>
+                </div>
 
-            <button onClick={handleScan}>
-                Scan Email
-            </button>
+                <nav className="nav">
+                    <NavLink to="/ingestion" className={({ isActive }) => `navItem ${isActive ? "active" : ""}`}>
+                        Ingestion
+                    </NavLink>
+                </nav>
+            </aside>
 
-            {result && (
-                <pre>{JSON.stringify(result, null, 2)}</pre>
-            )}
+            <main className="content">
+                <Routes>
+                    <Route path="/" element={<Navigate to="/ingestion" replace />} />
+                    <Route path="/ingestion" element={<IngestionPage />} />
+                    <Route path="*" element={<NotFound />} />
+                </Routes>
+            </main>
         </div>
-    )
+    );
 }
 
-export default App
+function NotFound() {
+    return (
+        <div className="page">
+            <h1>404</h1>
+            <p>Pagina nu există.</p>
+        </div>
+    );
+}
