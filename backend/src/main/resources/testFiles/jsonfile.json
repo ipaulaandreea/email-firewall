@@ -1,0 +1,6 @@
+{
+  "subject": "Test JSON",
+  "bodyText": "Hello",
+  "from": "alice@example.com",
+  "to": ["bob@example.com"]
+}

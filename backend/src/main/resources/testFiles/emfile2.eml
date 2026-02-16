@@ -1,0 +1,15 @@
+From: Carol <carol@example.com>
+To: Dan <dan@example.com>
+Subject: Test EML HTML
+Date: Sun, 15 Feb 2026 10:05:00 +0200
+Message-ID: <test-html-001@example.com>
+MIME-Version: 1.0
+Content-Type: text/html; charset="UTF-8"
+
+<html>
+  <body>
+    <h2>Salut!</h2>
+    <p>Acesta este un <b>email HTML</b> de test.</p>
+    <p>Link: <a href="https://example.com">example.com</a></p>
+  </body>
+</html>
