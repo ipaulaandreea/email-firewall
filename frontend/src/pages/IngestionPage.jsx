@@ -66,7 +66,7 @@ export default function IngestionPage() {
         try {
             const payload = {
                 subject: jsonForm.subject,
-                body: jsonForm.body,
+                bodyText: jsonForm.body,
                 from: jsonForm.from,
                 to: jsonForm.to ? [jsonForm.to] : [],
             };

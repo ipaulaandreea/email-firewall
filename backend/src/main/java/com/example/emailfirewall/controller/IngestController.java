@@ -34,8 +34,13 @@ public class IngestController {
 
     @PostMapping(value = "/eml", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<IngestResponse> ingestEml(@RequestPart("file") MultipartFile file) throws Exception {
+        if (file.isEmpty()) {
+            throw new IllegalArgumentException("File is empty");
+        }
+
         ParsedEmail parsed = emlParserService.parse(file.getInputStream());
-        return ResponseEntity.ok(emailService.ingestParsedEmail(parsed, IngestSource.EML_API));
+        IngestResponse result = emailService.ingestParsedEmail(parsed, IngestSource.EML_API);
+        return ResponseEntity.ok(result);
     }
 
     @PostMapping(value = "/eml/batch", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

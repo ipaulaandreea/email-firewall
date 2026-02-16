@@ -9,6 +9,7 @@ import com.example.emailfirewall.enums.IngestSource;
 import com.example.emailfirewall.repository.EmailRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.web.util.HtmlUtils;
 
 import java.util.UUID;
 
@@ -39,15 +40,9 @@ public class EmailService {
         email.setFromAddress(p.from != null ? p.from : "unknown");
         email.setSubject(p.subject);
         email.setBodyText(p.bodyText);
-        email.setBodyHtmlSanitized(p.bodyHtml);
+        email.setBodyHtmlSanitized(p.bodyHtml != null ? HtmlUtils.htmlEscape(p.bodyHtml) : null);
 
         if (p.to != null) email.getToAddresses().addAll(p.to);
-
-        email.setStatus(EmailStatus.RECEIVED);
-        email.setVerdict(EmailVerdict.ALLOW);
-        email.setThreatScore(0);
-
-        emailRepository.save(email);
 
         RuleEvaluationResult eval = ruleEvaluationService.evaluate(email.getFromAddress(), email.getSubject());
 

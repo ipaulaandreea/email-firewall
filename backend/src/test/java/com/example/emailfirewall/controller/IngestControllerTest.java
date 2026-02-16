@@ -6,6 +6,7 @@ import com.example.emailfirewall.dto.IngestResponse;
 import com.example.emailfirewall.enums.EmailStatus;
 import com.example.emailfirewall.enums.EmailVerdict;
 import com.example.emailfirewall.enums.IngestSource;
+import com.example.emailfirewall.exception.GlobalExceptionHandler;
 import com.example.emailfirewall.service.AsyncIngestService;
 import com.example.emailfirewall.service.EmailService;
 import com.example.emailfirewall.service.EmlParserService;
@@ -19,6 +20,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
@@ -46,12 +49,17 @@ class IngestControllerTest {
     @InjectMocks
     private IngestController ingestController;
 
+    private MockMvc mockMvc;
     private IngestEmailRequest ingestRequest;
     private IngestResponse ingestResponse;
     private ParsedEmail parsedEmail;
 
     @BeforeEach
     void setUp() {
+        mockMvc = MockMvcBuilders.standaloneSetup(ingestController)
+                .setControllerAdvice(GlobalExceptionHandler.class)
+                .build();
+
         ingestRequest = new IngestEmailRequest(
                 "sender@example.com",
                 List.of("recipient@example.com"),
@@ -91,7 +99,6 @@ class IngestControllerTest {
         verify(emailService, times(1)).ingestJson(ingestRequest);
     }
 
-
     @Test
     void ingestEml_ShouldParseAndIngestEmail() throws Exception {
         MockMultipartFile file = new MockMultipartFile(
@@ -111,6 +118,48 @@ class IngestControllerTest {
         assertNotNull(response.getBody().emailId());
         verify(emlParserService, times(1)).parse(any(InputStream.class));
         verify(emailService, times(1)).ingestParsedEmail(parsedEmail, IngestSource.EML_API);
+    }
+
+    @Test
+    void ingestEml_ShouldThrowExceptionWhenFileIsEmpty() throws Exception {
+        MockMultipartFile emptyFile = new MockMultipartFile(
+                "file",
+                "test.eml",
+                "message/rfc822",
+                new byte[0]
+        );
+
+        assertThrows(IllegalArgumentException.class, () -> ingestController.ingestEml(emptyFile));
+    }
+
+    @Test
+    void ingestEml_ShouldThrowExceptionOnIOError() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "test.eml",
+                "message/rfc822",
+                "email content".getBytes()
+        );
+
+        when(emlParserService.parse(any(InputStream.class)))
+                .thenThrow(new java.io.IOException("Read error"));
+
+        assertThrows(java.io.IOException.class, () -> ingestController.ingestEml(file));
+    }
+
+    @Test
+    void ingestEml_ShouldThrowExceptionOnParseError() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "test.eml",
+                "message/rfc822",
+                "email content".getBytes()
+        );
+
+        when(emlParserService.parse(any(InputStream.class)))
+                .thenThrow(new IllegalArgumentException("Invalid format"));
+
+        assertThrows(IllegalArgumentException.class, () -> ingestController.ingestEml(file));
     }
 
     @Test
@@ -159,7 +208,6 @@ class IngestControllerTest {
         assertNotNull(response.getBody().get(0).error());
         assertTrue(response.getBody().get(0).error().contains("Parse error"));
     }
-
 
     @Test
     void ingestEmlBatch_ShouldHandleNullFilename() {
