@@ -1,8 +1,6 @@
 {
   "subject": "Test JSON",
-  "body": "Hello",
+  "bodyText": "Hello",
   "from": "alice@example.com",
-  "to": ["bob@example.com"],
-  "cc": ["cc1@example.com"],
-  "bcc": []
+  "to": ["bob@example.com"]
 }

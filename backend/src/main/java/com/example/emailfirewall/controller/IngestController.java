@@ -45,11 +45,29 @@ public class IngestController {
 
     @PostMapping(value = "/eml/batch", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<List<BatchIngestItemResponse>> ingestEmlBatch(
-            @RequestPart("files") MultipartFile[] files
+            @RequestPart(value = "files", required = false) MultipartFile[] files
     ) {
+
+        if (files == null || files.length == 0) {
+            throw new IllegalArgumentException("No files provided for batch ingestion");
+        }
+
         List<CompletableFuture<BatchIngestItemResponse>> futures = new ArrayList<>();
 
         for (MultipartFile f : files) {
+
+            if (f == null || f.isEmpty()) {
+                futures.add(CompletableFuture.completedFuture(
+                        new BatchIngestItemResponse(
+                                "unknown.eml",
+                                false,
+                                null,
+                                "Empty file"
+                        )
+                ));
+                continue;
+            }
+
             CompletableFuture<BatchIngestItemResponse> fut =
                     asyncIngestService.ingestOneEmlAsync(f)
                             .thenApply(res -> new BatchIngestItemResponse(
@@ -64,7 +82,8 @@ public class IngestController {
 
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 
-        List<BatchIngestItemResponse> out = futures.stream().map(CompletableFuture::join).toList();
+        List<BatchIngestItemResponse> out =
+                futures.stream().map(CompletableFuture::join).toList();
         return ResponseEntity.ok(out);
     }
 

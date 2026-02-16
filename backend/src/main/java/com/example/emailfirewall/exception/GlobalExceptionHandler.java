@@ -37,7 +37,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<IngestErrorResponse> handleGenericException(Exception e) {
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new IngestErrorResponse("Unexpected error", "INTERNAL_ERROR", HttpStatus.INTERNAL_SERVER_ERROR.value()));
+        int status = HttpStatus.INTERNAL_SERVER_ERROR.value();
+        return ResponseEntity.status(status).body(
+                new IngestErrorResponse(
+                        e.getClass().getSimpleName() + ": " + (e.getMessage() != null ? e.getMessage() : ""),
+                        "INTERNAL_ERROR",
+                        status
+                )
+        );
     }
 }

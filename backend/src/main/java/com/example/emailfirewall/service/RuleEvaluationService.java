@@ -60,16 +60,21 @@ public class RuleEvaluationService {
 
     private void apply(RuleEntity rule, RuleEvaluationResult result) {
         if (rule.getAction() == RuleAction.ADD_SCORE) {
-            int delta = rule.getScoreDelta() != null ? rule.getScoreDelta() : 0;
+            int delta = rule.getScoreDelta() != null ? rule.getScoreDelta() :0;
             result.addScore(delta, rule.getName());
             return;
         }
 
         if (rule.getAction() == RuleAction.SET_VERDICT) {
-            EmailVerdict verdict = rule.getVerdict(); // presupunem că e EmailVerdict în entity
+            EmailVerdict verdict = rule.getVerdict();
             if (verdict != null) {
                 result.forceVerdict(verdict, rule.getName());
             }
+            return;
+        }
+
+        if (rule.getAction() == RuleAction.BYPASS) {
+            result.forceVerdict(EmailVerdict.ALLOW, rule.getName());
         }
     }
 

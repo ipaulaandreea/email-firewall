@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.InputStream;
 import java.util.concurrent.CompletableFuture;
 
 @Service
@@ -20,8 +21,8 @@ public class AsyncIngestService {
     @Async("ingestExecutor")
     @Transactional
     public CompletableFuture<IngestResponse> ingestOneEmlAsync(MultipartFile file) {
-        try {
-            ParsedEmail parsed = emlParserService.parse(file.getInputStream());
+        try (InputStream in = file.getInputStream()) {
+            ParsedEmail parsed = emlParserService.parse(in);
             IngestResponse resp = emailService.ingestParsedEmail(parsed, IngestSource.EML_API);
             return CompletableFuture.completedFuture(resp);
         } catch (Exception e) {
