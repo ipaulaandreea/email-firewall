@@ -12,4 +12,11 @@ public class ParsedEmail {
     public String bodyText;
     public String bodyHtml;
     public Map<String, String> headers = new HashMap<>();
+
+    public <E, V, K> ParsedEmail(String mail, List<E> es, String testSubject, String testBody, String s, Map<K,V> of, List<E> of1) {
+    }
+
+    public ParsedEmail() {
+
+    }
 }

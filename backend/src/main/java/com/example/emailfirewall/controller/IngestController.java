@@ -64,7 +64,8 @@ public class IngestController {
     }
 
     private String safeName(MultipartFile f) {
-        return (f != null && f.getOriginalFilename() != null) ? f.getOriginalFilename() : "unknown.eml";
+        String name = (f != null) ? f.getOriginalFilename() : null;
+        return (name != null && !name.isEmpty()) ? name : "unknown.eml";
     }
 
     private String rootMessage(Throwable ex) {
