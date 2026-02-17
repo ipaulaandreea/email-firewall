@@ -1,11 +1,3 @@
-INSERT INTO users (id, email, password_hash, role)
-VALUES (
-           gen_random_uuid(),
-           'admin@example.com',
-           '$2a$12$X81bwyQ2T3Pj/QW6SIJosuT964EKX7L79FrBtPpYPQM8Ugr0kOy1y',
-           'ADMIN'
-       );
-
 INSERT INTO rules (name, type, target, pattern, action, verdict, enabled, priority)
 VALUES (
            'Blacklist sender domain evil.com',

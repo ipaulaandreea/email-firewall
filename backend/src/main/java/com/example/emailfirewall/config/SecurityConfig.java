@@ -35,9 +35,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
 
-                        .requestMatchers("/api/ingest/eml/batch").hasRole("ADMIN")
+                        .requestMatchers("/api/ingest/eml/batch/**").hasRole("ADMIN")
                         .requestMatchers("/api/ingest/json").hasAnyRole("ADMIN", "DEVELOPER")
                         .requestMatchers("/api/ingest/eml").hasAnyRole("ADMIN", "ANALYST", "DEVELOPER")
+                        .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
 
                         .anyRequest().authenticated()
                 )
