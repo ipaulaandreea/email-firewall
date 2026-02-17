@@ -2,6 +2,8 @@ package com.example.emailfirewall.service;
 
 import com.example.emailfirewall.dto.AuthResponse;
 import com.example.emailfirewall.entity.UserEntity;
+import com.example.emailfirewall.exception.InvalidCredentialsException;
+import com.example.emailfirewall.exception.UserAlreadyExistsException;
 import com.example.emailfirewall.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -69,18 +71,20 @@ class AuthServiceTest {
     }
 
     @Test
-    void authenticate_userNotFound_throws() {
+    void authenticate_userNotFound_throwsInvalidCredentials() {
         when(userRepository.findByEmail("missing@example.com")).thenReturn(Optional.empty());
 
-        RuntimeException ex = assertThrows(RuntimeException.class,
-                () -> authService.authenticate("missing@example.com", "password123"));
+        InvalidCredentialsException ex = assertThrows(
+                InvalidCredentialsException.class,
+                () -> authService.authenticate("missing@example.com", "password123")
+        );
 
-        assertEquals("Invalid credentials", ex.getMessage());
+        assertEquals("Invalid Credentials", ex.getMessage());
         verify(passwordEncoder, never()).matches(any(), any());
     }
 
     @Test
-    void authenticate_passwordMismatch_throws() {
+    void authenticate_passwordMismatch_throwsInvalidCredentials() {
         UserEntity u = new UserEntity();
         u.setEmail("admin@example.com");
         u.setPasswordHash("HASH");
@@ -89,10 +93,12 @@ class AuthServiceTest {
         when(userRepository.findByEmail("admin@example.com")).thenReturn(Optional.of(u));
         when(passwordEncoder.matches("wrong", "HASH")).thenReturn(false);
 
-        RuntimeException ex = assertThrows(RuntimeException.class,
-                () -> authService.authenticate("admin@example.com", "wrong"));
+        InvalidCredentialsException ex = assertThrows(
+                InvalidCredentialsException.class,
+                () -> authService.authenticate("admin@example.com", "wrong")
+        );
 
-        assertEquals("Invalid credentials", ex.getMessage());
+        assertEquals("Invalid Credentials", ex.getMessage());
         verify(passwordEncoder).matches("wrong", "HASH");
     }
 
@@ -105,29 +111,36 @@ class AuthServiceTest {
 
         AuthResponse res = authService.register("newuser@example.com", "password123");
 
+        assertNotNull(res);
         assertEquals("newuser@example.com", res.getEmail());
         assertNotNull(res.getToken());
         assertFalse(res.getToken().isBlank());
 
         verify(userRepository).save(captor.capture());
         UserEntity saved = captor.getValue();
+
         assertEquals("newuser@example.com", saved.getEmail());
         assertEquals("ENC_HASH", saved.getPasswordHash());
-        // dacă ai enum, înlocuiești cu Role.ANALYST
-        assertEquals("ANALYST", String.valueOf(saved.getRole()));
+
+        assertEquals("ANALYST", saved.getRole());
+
+        verify(passwordEncoder).encode("password123");
     }
 
     @Test
-    void register_existingUser_throws() {
+    void register_existingUser_throwsUserAlreadyExists() {
         UserEntity existing = new UserEntity();
         existing.setEmail("newuser@example.com");
 
         when(userRepository.findByEmail("newuser@example.com")).thenReturn(Optional.of(existing));
 
-        RuntimeException ex = assertThrows(RuntimeException.class,
-                () -> authService.register("newuser@example.com", "password123"));
+        UserAlreadyExistsException ex = assertThrows(
+                UserAlreadyExistsException.class,
+                () -> authService.register("newuser@example.com", "password123")
+        );
 
         assertEquals("User already exists", ex.getMessage());
         verify(userRepository, never()).save(any());
+        verify(passwordEncoder, never()).encode(any());
     }
 }

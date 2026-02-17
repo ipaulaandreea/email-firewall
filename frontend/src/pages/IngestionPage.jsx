@@ -9,34 +9,7 @@ function pretty(obj) {
     }
 }
 
-async function fetchJson(url, options) {
-    const res = await fetch(url, options);
-
-    const text = await res.text();
-    let data = null;
-    try {
-        data = text ? JSON.parse(text) : null;
-    } catch {
-        data = text || null;
-    }
-
-    if (!res.ok) {
-        const msg =
-            (data && data.message) ||
-            (data && data.error) ||
-            (typeof data === "string" ? data : null) ||
-            `HTTP ${res.status}`;
-        const err = new Error(msg);
-        err.status = res.status;
-        err.data = data;
-        throw err;
-    }
-
-    return data;
-}
-
 export default function IngestionPage() {
-
     const canBatch = hasRole("ADMIN");
     const canJson = hasRole("ADMIN", "DEVELOPER");
     const canEmlSingle = hasRole("ADMIN", "ANALYST", "DEVELOPER");
@@ -64,7 +37,36 @@ export default function IngestionPage() {
 
     const hasBatch = useMemo(() => batchFiles && batchFiles.length > 0, [batchFiles]);
 
+    async function fetchJson(url, options = {}) {
+        const token = localStorage.getItem("token");
+
+        const headers = new Headers(options.headers || {});
+        if (token) headers.set("Authorization", `Bearer ${token}`);
+
+        const res = await fetch(url, { ...options, headers });
+
+        const text = await res.text();
+        let data = null;
+        try { data = text ? JSON.parse(text) : null; }
+        catch { data = text || null; }
+
+        if (!res.ok) {
+            const msg =
+                (data && data.message) ||
+                (data && data.error) ||
+                (typeof data === "string" ? data : null) ||
+                `HTTP ${res.status}`;
+            const err = new Error(msg);
+            err.status = res.status;
+            err.data = data;
+            throw err;
+        }
+
+        return data;
+    }
+
     async function submitJson(e) {
+        const token = localStorage.getItem("token");
         e.preventDefault();
         setJsonError(null);
         setJsonResult(null);
@@ -80,7 +82,10 @@ export default function IngestionPage() {
 
             const data = await fetchJson("/api/ingest/json", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
                 body: JSON.stringify(payload),
             });
 
@@ -93,6 +98,7 @@ export default function IngestionPage() {
     }
 
     async function submitEml(e) {
+        const token = localStorage.getItem("token");
         e.preventDefault();
         setEmlError(null);
         setEmlResult(null);
@@ -109,6 +115,9 @@ export default function IngestionPage() {
 
             const data = await fetchJson("/api/ingest/eml", {
                 method: "POST",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
                 body: fd,
             });
 
@@ -146,7 +155,6 @@ export default function IngestionPage() {
                 method: "POST",
                 headers: {
                     Authorization: `Bearer ${token}`,
-                    // IMPORTANT: nu seta Content-Type aici
                 },
                 body: fd,
             });

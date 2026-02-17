@@ -2,6 +2,8 @@ package com.example.emailfirewall.service;
 
 import com.example.emailfirewall.dto.AuthResponse;
 import com.example.emailfirewall.entity.UserEntity;
+import com.example.emailfirewall.exception.InvalidCredentialsException;
+import com.example.emailfirewall.exception.UserAlreadyExistsException;
 import com.example.emailfirewall.repository.UserRepository;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -34,10 +36,10 @@ public class AuthService {
     public AuthResponse authenticate(String email, String password) {
         email = email.trim().toLowerCase();
         UserEntity user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Invalid credentials"));
+                .orElseThrow(InvalidCredentialsException::new);
 
         if (!passwordEncoder.matches(password, user.getPasswordHash())) {
-            throw new RuntimeException("Invalid credentials");
+            throw new InvalidCredentialsException();
         }
 
         String token = generateJwtToken(user);
@@ -51,7 +53,7 @@ public class AuthService {
 
     public AuthResponse register(String email, String password) {
         if (userRepository.findByEmail(email).isPresent()) {
-            throw new RuntimeException("User already exists");
+            throw new UserAlreadyExistsException();
         }
 
         UserEntity user = new UserEntity();
