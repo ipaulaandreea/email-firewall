@@ -7,7 +7,7 @@ import com.example.emailfirewall.enums.IngestSource;
 import com.example.emailfirewall.service.AsyncIngestService;
 import com.example.emailfirewall.service.EmailService;
 import com.example.emailfirewall.service.EmlParserService;
-import com.example.emailfirewall.service.ParsedEmail;
+import com.example.emailfirewall.dto.ParsedEmail;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;

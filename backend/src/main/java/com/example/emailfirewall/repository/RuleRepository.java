@@ -7,4 +7,6 @@ import java.util.UUID;
 
 public interface RuleRepository extends JpaRepository<RuleEntity, UUID> {
     List<RuleEntity> findByEnabledTrueOrderByPriorityAsc();
+    List<RuleEntity> findAllByOrderByPriorityAsc();
+
 }

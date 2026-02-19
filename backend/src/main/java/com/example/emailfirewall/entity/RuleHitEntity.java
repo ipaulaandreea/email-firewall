@@ -1,5 +1,6 @@
 package com.example.emailfirewall.entity;
 
+import com.example.emailfirewall.enums.EmailVerdict;
 import jakarta.persistence.*;
 
 import java.time.Instant;
@@ -29,6 +30,9 @@ public class RuleHitEntity {
 
     @Column(columnDefinition = "text")
     private String message;
+
+    @Enumerated(EnumType.STRING)
+    private EmailVerdict forcedVerdict;
 
     public Long getId() {
         return id;

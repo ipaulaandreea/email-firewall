@@ -1,5 +1,6 @@
 package com.example.emailfirewall.service;
 
+import com.example.emailfirewall.dto.ParsedEmail;
 import jakarta.mail.Address;
 import jakarta.mail.BodyPart;
 import jakarta.mail.Multipart;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.Properties;
 
@@ -42,7 +44,9 @@ public class EmlParserService {
             if (idx > 0) {
                 String name = line.substring(0, idx).trim();
                 String value = line.substring(idx + 1).trim();
-                out.headers.merge(name, value, (a, b) -> a + "; " + b);
+                out.headers
+                        .computeIfAbsent(name, k -> new ArrayList<>())
+                        .add(value);
             }
         }
 

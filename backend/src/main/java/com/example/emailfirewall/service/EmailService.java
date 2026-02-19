@@ -2,6 +2,7 @@ package com.example.emailfirewall.service;
 
 import com.example.emailfirewall.dto.IngestEmailRequest;
 import com.example.emailfirewall.dto.IngestResponse;
+import com.example.emailfirewall.dto.ParsedEmail;
 import com.example.emailfirewall.entity.EmailEntity;
 import com.example.emailfirewall.enums.EmailStatus;
 import com.example.emailfirewall.enums.EmailVerdict;
@@ -11,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.HtmlUtils;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -27,7 +29,11 @@ public class EmailService {
         p.subject = req.subject();
         p.bodyText = req.bodyText();
         p.bodyHtml = req.bodyHtml();
-        if (req.headers() != null) p.headers.putAll(req.headers());
+        if (req.headers() != null) {
+            req.headers().forEach((k, v)->
+                p.headers.put(k, List.of(v))
+            );
+        }
 
         return ingestParsedEmail(p, IngestSource.JSON_API);
     }
@@ -44,7 +50,7 @@ public class EmailService {
 
         if (p.to != null) email.getToAddresses().addAll(p.to);
 
-        RuleEvaluationResult eval = ruleEvaluationService.evaluate(email.getFromAddress(), email.getSubject());
+        RuleEvaluationResult eval = ruleEvaluationService.evaluate(p);
 
         int score = eval.getTotalScore();
         EmailVerdict verdict = determineVerdict(score, eval.getForcedVerdict());
