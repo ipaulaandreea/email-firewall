@@ -192,3 +192,7 @@
     transform: translateX(20px);
     background: #bbf7d0;
 }
+
+.cardsGrid.single {
+    grid-template-columns: 1fr;
+}
