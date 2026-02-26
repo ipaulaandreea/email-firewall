@@ -1,6 +1,7 @@
 package com.example.emailfirewall.service;
 
 import com.example.emailfirewall.dto.IngestResponse;
+import com.example.emailfirewall.dto.ParsedEmail;
 import com.example.emailfirewall.enums.IngestSource;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Async;

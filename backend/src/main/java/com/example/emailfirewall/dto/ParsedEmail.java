@@ -1,0 +1,30 @@
+package com.example.emailfirewall.dto;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public class ParsedEmail {
+    public String from;
+    public List<String> to = new ArrayList<>();
+    public String subject;
+    public String bodyText;
+    public String bodyHtml;
+    public Map<String, List<String>> headers = new HashMap<>();
+
+    public List<AttachmentMeta> attachments = new ArrayList<>();
+
+    public <E, V, K> ParsedEmail(String mail,
+                                 List<E> es,
+                                 String testSubject,
+                                 String testBody,
+                                 String s,
+                                 Map<K,V> of,
+                                 List<E> of1) {
+    }
+
+    public ParsedEmail() {
+
+    }
+}

@@ -10,7 +10,7 @@ import com.example.emailfirewall.exception.GlobalExceptionHandler;
 import com.example.emailfirewall.service.AsyncIngestService;
 import com.example.emailfirewall.service.EmailService;
 import com.example.emailfirewall.service.EmlParserService;
-import com.example.emailfirewall.service.ParsedEmail;
+import com.example.emailfirewall.dto.ParsedEmail;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

@@ -6,5 +6,5 @@ public enum RuleTarget {
     SUBJECT,
     BODY,
     ATTACHMENT_EXT,
-    ATTACHMENT_SIZE
+    ATTACHMENT_SIZE,
 }

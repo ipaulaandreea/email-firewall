@@ -4,6 +4,7 @@ import LoginPage from "./pages/LoginPage.jsx";
 import RegisterPage from "./pages/RegisterPage.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import { clearAuth, isAuthed } from "./utils/auth.js";
+import RulesPage from "./pages/RulesPage.jsx";
 
 function AppLayout() {
     const navigate = useNavigate();
@@ -32,6 +33,9 @@ function AppLayout() {
                 <nav className="nav">
                     <NavLink to="/ingestion" className={({ isActive }) => `navItem ${isActive ? "active" : ""}`}>
                         Ingestion
+                    </NavLink>
+                    <NavLink to="/rules" className={({ isActive }) => `navItem ${isActive ? "active" : ""}`}>
+                        Rules
                     </NavLink>
                 </nav>
 
@@ -78,6 +82,7 @@ export default function App() {
                 }
             >
                 <Route path="/ingestion" element={<IngestionPage />} />
+                <Route path="/rules" element={<RulesPage />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />

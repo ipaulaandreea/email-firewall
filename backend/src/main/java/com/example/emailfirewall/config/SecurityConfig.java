@@ -3,6 +3,7 @@ package com.example.emailfirewall.config;
 import com.example.emailfirewall.security.JwtAuthFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -34,12 +35,14 @@ public class SecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
 
                         .requestMatchers("/api/ingest/eml/batch/**").hasRole("ADMIN")
                         .requestMatchers("/api/ingest/json").hasAnyRole("ADMIN", "DEVELOPER")
                         .requestMatchers("/api/ingest/eml").hasAnyRole("ADMIN", "ANALYST", "DEVELOPER")
-                        .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
 
+                        .requestMatchers(HttpMethod.GET, "/api/rules/**").hasAnyRole("ADMIN", "ANALYST", "DEVELOPER")
+                        .requestMatchers("/api/rules/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
@@ -57,7 +60,7 @@ public class SecurityConfig {
                 "http://localhost:5175"
         ));
 
-        cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         cfg.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         cfg.setExposedHeaders(List.of("Authorization"));
         cfg.setAllowCredentials(false);
