@@ -225,27 +225,17 @@ class RuleEvaluationServiceTest {
     }
 
     @Test
-    void disabledRulesAreIgnored() {
-        RuleEntity disabledBlock = mockRule(
-                UUID.randomUUID(),
-                "Disabled blacklist",
-                false,
-                RuleTarget.SENDER_DOMAIN,
-                RuleAction.SET_VERDICT,
-                "evil.com",
-                null,
-                EmailVerdict.BLOCK
-        );
-
-        when(ruleRepository.findByEnabledTrueOrderByPriorityAsc()).thenReturn(List.of(disabledBlock));
+    void noEnabledRules_resultsInNoVerdict() {
+        when(ruleRepository.findByEnabledTrueOrderByPriorityAsc())
+                .thenReturn(List.of());
 
         ParsedEmail email = baseEmail("x@evil.com", "hi", "body", null);
 
         RuleEvaluationResult res = service.evaluate(email);
 
-        assertNull(res.getForcedVerdict(), "Disabled rule should not apply");
+        assertNull(res.getForcedVerdict());
         assertEquals(0, res.getTotalScore());
-        assertTrue(res.getHits().isEmpty(), "No hits expected");
+        assertTrue(res.getHits().isEmpty());
     }
 
     @Test

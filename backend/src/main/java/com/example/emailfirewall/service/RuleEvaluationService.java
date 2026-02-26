@@ -19,6 +19,18 @@ public class RuleEvaluationService {
 
     private final RuleRepository ruleRepository;
 
+    private static final int MAX_PATTERN_CACHE_SIZE = 500;
+
+    private final Map<String, Pattern> patternCache =
+            Collections.synchronizedMap(
+                    new LinkedHashMap<>(128, 0.75f, true) {
+                        @Override
+                        protected boolean removeEldestEntry(Map.Entry<String, Pattern> eldest) {
+                            return size() > MAX_PATTERN_CACHE_SIZE;
+                        }
+                    }
+            );
+
     public RuleEvaluationResult evaluate(ParsedEmail email) {
         RuleEvaluationResult result = new RuleEvaluationResult();
 
@@ -37,10 +49,6 @@ public class RuleEvaluationService {
             if (matches(r, from, domain, subject, body, email)) {
                 apply(r, result, subject, body, email);
 
-                if (result.getForcedVerdict() == null) {
-                    result.forceVerdict(r.getId(), r.getName(), EmailVerdict.ALLOW,
-                            "Whitelisted by rule: " + r.getName());
-                }
                 return result;
             }
         }
@@ -51,11 +59,6 @@ public class RuleEvaluationService {
 
             if (matches(r, from, domain, subject, body, email)) {
                 apply(r, result, subject, body, email);
-
-                if (result.getForcedVerdict() == null) {
-                    result.forceVerdict(r.getId(), r.getName(), EmailVerdict.BLOCK,
-                            "Blacklisted by rule: " + r.getName());
-                }
                 return result;
             }
         }
@@ -241,8 +244,14 @@ public class RuleEvaluationService {
 
     private boolean regexMatch(String text, String regex) {
         try {
-            return Pattern
-                    .compile(regex, Pattern.CASE_INSENSITIVE | Pattern.DOTALL)
+            if (regex == null || regex.isBlank()) return false;
+
+            Pattern pattern = patternCache.computeIfAbsent(
+                    regex,
+                    r -> Pattern.compile(r, Pattern.CASE_INSENSITIVE | Pattern.DOTALL)
+            );
+
+            return pattern
                     .matcher(text != null ? text : "")
                     .find();
         } catch (Exception ignored) {

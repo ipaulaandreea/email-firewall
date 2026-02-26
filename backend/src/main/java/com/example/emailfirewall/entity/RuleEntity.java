@@ -47,4 +47,16 @@ public class RuleEntity {
 
     @Column(nullable = false)
     private Instant updatedAt = Instant.now();
+
+    @PrePersist
+    public void prePersist() {
+        if (updatedAt == null) {
+            updatedAt = Instant.now();
+        }
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        updatedAt = Instant.now();
+    }
 }

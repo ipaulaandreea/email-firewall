@@ -22,7 +22,7 @@ const TARGETS = [
 ];
 
 const ACTIONS = ["ADD_SCORE", "SET_VERDICT", "BYPASS"];
-const VERDICTS = ["ALLOW", "BLOCK"];
+const VERDICTS = ["ALLOW", "BLOCK", "QUARANTINE"];
 
 const emptyRule = {
     id: null,
