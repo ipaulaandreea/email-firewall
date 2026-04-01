@@ -1,5 +1,6 @@
 package com.example.emailfirewall.dto;
 
+import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -14,6 +15,9 @@ public class ParsedEmail {
     public Map<String, List<String>> headers = new HashMap<>();
 
     public List<AttachmentMeta> attachments = new ArrayList<>();
+
+    public InetAddress smtpClientIp;
+    public byte[] rawEml;
 
     public <E, V, K> ParsedEmail(String mail,
                                  List<E> es,

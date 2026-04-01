@@ -1,0 +1,23 @@
+From: Attach Demo <attach@example.com>
+To: Analyst <analyst@example.com>
+Subject: Attachment demo
+Date: Tue, 01 Apr 2026 17:45:00 +0300
+Message-ID: <rulehit-attach-001@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="BOUNDARY-GETEGTW-1"
+
+--BOUNDARY-GETEGTW-1
+Content-Type: text/plain; charset="UTF-8"
+
+This email contains an attachment named document.getegtw.
+It should trigger the ATTACHMENT_EXT rule (pattern getegtw).
+
+--BOUNDARY-GETEGTW-1
+Content-Type: application/octet-stream
+Content-Disposition: attachment; filename="document.getegtw"
+Content-Transfer-Encoding: base64
+
+SGVsbG8sIHRoaXMgaXMgYSBkZW1vIGF0dGFjaG1lbnQuCg==
+
+--BOUNDARY-GETEGTW-1--
+

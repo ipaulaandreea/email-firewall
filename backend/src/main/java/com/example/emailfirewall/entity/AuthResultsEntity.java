@@ -5,6 +5,8 @@ import com.example.emailfirewall.enums.DmarcPolicy;
 import com.example.emailfirewall.enums.DmarcResult;
 import com.example.emailfirewall.enums.SpfResult;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "auth_results")
@@ -29,6 +31,7 @@ public class AuthResultsEntity {
     @Enumerated(EnumType.STRING)
     private DmarcPolicy dmarcPolicy;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private String detailsJson;
 

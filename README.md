@@ -121,3 +121,18 @@ L --> N
 M --> N
 
 ```
+
+---
+
+## Test EML fixtures (deterministic identity checks)
+
+În `backend/src/main/resources/testFiles/` ai câteva fișiere `.eml` pregătite pentru demo/ingest.
+
+- `emfile.eml` — include `Authentication-Results` cu `spf=pass` și `dkim=pass` + domeniu aligned (`example.com`).
+  - Așteptat: SPF=PASS, DKIM=PASS, DMARC=PASS (independent de DNS pentru SPF/DKIM)
+
+- `emfile_auth_fail.eml` — include `Authentication-Results` cu `spf=fail` și `dkim=fail` (nealigned / evil.com).
+  - Așteptat: SPF=FAIL, DKIM=FAIL, DMARC foarte probabil FAIL (policy depinde de DMARC record DNS)
+
+- `emfile_no_auth_results.eml` — nu include `Authentication-Results`.
+  - Așteptat: DKIM=NONE (în implementarea curentă), SPF/DMARC depind de resolver-ul DNS + IP inferred din `Received`
