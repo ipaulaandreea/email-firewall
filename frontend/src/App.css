@@ -244,6 +244,82 @@ textarea {
     overflow: auto;
 }
 
+/* ---------- Identity checks (SPF/DKIM/DMARC) ---------- */
+
+.authRow {
+  display: flex;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.authRow:first-of-type {
+  border-top: none;
+}
+
+.authRowLeft {
+  width: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.authLabel {
+  font-weight: 600;
+}
+
+.authRowBody {
+  flex: 1;
+}
+
+.badge {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.badgePass {
+  border-color: rgba(34, 197, 94, 0.5);
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.badgeFail {
+  border-color: rgba(239, 68, 68, 0.55);
+  background: rgba(239, 68, 68, 0.14);
+}
+
+.badgeWarn {
+  border-color: rgba(245, 158, 11, 0.55);
+  background: rgba(245, 158, 11, 0.14);
+}
+
+.badgeNone {
+  opacity: 0.9;
+}
+
+.authList {
+  margin-top: 8px;
+}
+
+.authSig {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.authSigText {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+}
+
+.muted {
+  opacity: 0.85;
+}
+
 /* ---------- Responsive ---------- */
 
 @media (max-width: 900px) {
@@ -349,4 +425,43 @@ textarea {
     color: #cbd5e1;
     font-size: 13px;
     line-height: 1.5;
+}
+
+/* Emails table */
+.emailsTableWrap {
+  overflow: auto;
+}
+
+.emailsTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.emailsTable th,
+.emailsTable td {
+  text-align: left;
+  padding: 10px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  vertical-align: top;
+}
+
+.emailsTable th {
+  position: sticky;
+  top: 0;
+  background: rgba(17, 34, 64, 0.98);
+  z-index: 1;
+  font-weight: 700;
+}
+
+.emailsTable tr:hover td {
+  background: rgba(255,255,255,0.03);
+}
+
+.rowExpanded td {
+  background: rgba(34,197,94,0.06);
+}
+
+.cellMono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas;
 }

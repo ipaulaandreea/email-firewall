@@ -1,0 +1,15 @@
+From: Demo Sender <demo@example.com>
+To: Analyst <analyst@example.com>
+Subject: URGENT: invoice payment required
+Date: Tue, 01 Apr 2026 17:40:00 +0300
+Message-ID: <rulehit-subject-urgent-001@example.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+
+Hello,
+
+This email is meant to trigger the rule:
+(?i)urgent|invoice|payment in SUBJECT (+30)
+
+Thanks.
+

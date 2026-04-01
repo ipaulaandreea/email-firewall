@@ -1,0 +1,10 @@
+From: Whitelisted Sender <whitelist@corp.xyz>
+To: Analyst <analyst@example.com>
+Subject: Any subject here
+Date: Tue, 01 Apr 2026 17:41:00 +0300
+Message-ID: <rulehit-domain-xyz-001@corp.xyz>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+
+This email should match SENDER_DOMAIN pattern xyz and force verdict ALLOW.
+

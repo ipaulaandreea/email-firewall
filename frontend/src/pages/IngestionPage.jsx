@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { hasRole, getRole } from "../utils/auth";
+import AuthResultsCard from "../components/AuthResultsCard";
 
 function pretty(obj) {
     try {
@@ -24,11 +25,13 @@ export default function IngestionPage() {
     const [jsonLoading, setJsonLoading] = useState(false);
     const [jsonError, setJsonError] = useState(null);
     const [jsonResult, setJsonResult] = useState(null);
+    const [jsonAuth, setJsonAuth] = useState(null);
 
     const [emlFile, setEmlFile] = useState(null);
     const [emlLoading, setEmlLoading] = useState(false);
     const [emlError, setEmlError] = useState(null);
     const [emlResult, setEmlResult] = useState(null);
+    const [emlAuth, setEmlAuth] = useState(null);
 
     const [batchFiles, setBatchFiles] = useState([]);
     const [batchLoading, setBatchLoading] = useState(false);
@@ -65,11 +68,21 @@ export default function IngestionPage() {
         return data;
     }
 
+    async function loadAuthForEmailId(emailId) {
+        if (!emailId) return null;
+        try {
+            return await fetchJson(`/api/emails/${emailId}/auth`, { method: "GET" });
+        } catch {
+            return null;
+        }
+    }
+
     async function submitJson(e) {
         const token = localStorage.getItem("token");
         e.preventDefault();
         setJsonError(null);
         setJsonResult(null);
+        setJsonAuth(null);
 
         setJsonLoading(true);
         try {
@@ -90,6 +103,8 @@ export default function IngestionPage() {
             });
 
             setJsonResult(data);
+            const auth = await loadAuthForEmailId(data?.emailId);
+            setJsonAuth(auth);
         } catch (err) {
             setJsonError(err);
         } finally {
@@ -102,6 +117,7 @@ export default function IngestionPage() {
         e.preventDefault();
         setEmlError(null);
         setEmlResult(null);
+        setEmlAuth(null);
 
         if (!emlFile) {
             setEmlError(new Error("Selectează un fișier .eml"));
@@ -122,6 +138,8 @@ export default function IngestionPage() {
             });
 
             setEmlResult(data);
+            const auth = await loadAuthForEmailId(data?.emailId);
+            setEmlAuth(auth);
         } catch (err) {
             setEmlError(err);
         } finally {
@@ -228,6 +246,7 @@ export default function IngestionPage() {
 
                         {jsonError && <ErrorBox err={jsonError} />}
                         {jsonResult && <ResultBox title="Response" data={jsonResult} />}
+                        {jsonAuth && <AuthResultsCard data={jsonAuth} />}
                     </section>
                 )}
 
@@ -252,6 +271,7 @@ export default function IngestionPage() {
 
                         {emlError && <ErrorBox err={emlError} />}
                         {emlResult && <ResultBox title="Response" data={emlResult} />}
+                        {emlAuth && <AuthResultsCard data={emlAuth} />}
                     </section>
                 )}
 

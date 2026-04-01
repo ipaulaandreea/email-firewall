@@ -3,6 +3,8 @@ To: Bob <bob@example.com>
 Subject: Test EML Simplu
 Date: Sun, 15 Feb 2026 10:00:00 +0200
 Message-ID: <test-simple-001@example.com>
+Received: from smtp.example.com (smtp.example.com [203.0.113.5]) by mx.local with ESMTP id TEST123;
+Authentication-Results: mx.local; spf=pass smtp.mailfrom=example.com; dkim=pass header.d=example.com
 MIME-Version: 1.0
 Content-Type: text/plain; charset="UTF-8"
 
