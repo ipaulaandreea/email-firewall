@@ -1,42 +1,43 @@
 package com.example.emailfirewall.service;
 
-import com.example.emailfirewall.dto.RuleHitDto;
+import com.example.emailfirewall.entity.RuleEntity;
 import com.example.emailfirewall.enums.EmailVerdict;
-import lombok.Getter;
 
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
-@Getter
 public class RuleEvaluationResult {
+
+    public record RuleHit(
+            RuleEntity rule,
+            Integer scoreDelta,
+            EmailVerdict forcedVerdict,
+            String message
+    ) {}
 
     private int totalScore;
     private EmailVerdict forcedVerdict;
-    private final List<RuleHitDto> hits = new ArrayList<>();
+    private final List<RuleHit> hits = new ArrayList<>();
 
-    public void addScore(UUID ruleId, String ruleName, int delta, String message) {
-        this.totalScore += delta;
-
-        hits.add(new RuleHitDto(
-                ruleId,
-                ruleName,
-                delta,
-                null,
-                message,
-                Instant.now()));
+    public int getTotalScore() {
+        return totalScore;
     }
 
-    public void forceVerdict(UUID ruleId, String ruleName, EmailVerdict verdict, String message) {
-        this.forcedVerdict = verdict;
-        hits.add(new RuleHitDto(
-                ruleId,
-                ruleName,
-                null,
-                verdict,
-                message,
-                Instant.now()
-        ));
+    public EmailVerdict getForcedVerdict() {
+        return forcedVerdict;
+    }
+
+    public List<RuleHit> getHits() {
+        return hits;
+    }
+
+    public void addScore(int delta, RuleEntity rule, String message) {
+        totalScore += delta;
+        hits.add(new RuleHit(rule, delta, null, message));
+    }
+
+    public void forceVerdict(EmailVerdict verdict, RuleEntity rule, String message) {
+        forcedVerdict = verdict;
+        hits.add(new RuleHit(rule, null, verdict, message));
     }
 }
