@@ -106,7 +106,9 @@ public class EmailController {
                     suspiciousUrlCount(e),
                     attachmentStatus(e),
                     attachmentCount(e),
-                    suspiciousAttachmentCount(e)
+                    suspiciousAttachmentCount(e),
+                    e.getAiSpamScore(),
+                    e.getAiClassification()
             );
         }).toList();
 

@@ -20,6 +20,8 @@ public record EmailListItemResponse(
         Integer suspiciousUrlCount,
         String attachmentStatus,
         Integer attachmentCount,
-        Integer suspiciousAttachmentCount
+        Integer suspiciousAttachmentCount,
+        Integer aiSpamScore,
+        String aiClassification
 ) {}
 

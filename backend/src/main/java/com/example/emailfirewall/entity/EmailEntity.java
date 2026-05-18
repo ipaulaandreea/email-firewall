@@ -4,6 +4,8 @@ import com.example.emailfirewall.enums.EmailStatus;
 import com.example.emailfirewall.enums.EmailVerdict;
 import com.example.emailfirewall.enums.IngestSource;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -18,6 +20,7 @@ public class EmailEntity {
     @Column(nullable = false, updatable = false)
     private UUID id;
 
+    @Setter
     @Column(nullable = false)
     private Instant receivedAt = Instant.now();
 
@@ -57,6 +60,21 @@ public class EmailEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
     private EmailVerdict verdict = EmailVerdict.ALLOW;
+
+    @Setter
+    @Getter
+    @Column(name = "ai_spam_score")
+    private Integer aiSpamScore;
+
+    @Setter
+    @Getter
+    @Column(name = "ai_classification")
+    private String aiClassification;
+
+    @Setter
+    @Getter
+    @Column(name = "ai_explanation", length = 4000)
+    private String aiExplanation;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
@@ -111,10 +129,6 @@ public class EmailEntity {
 
     public Instant getReceivedAt() {
         return receivedAt;
-    }
-
-    public void setReceivedAt(Instant receivedAt) {
-        this.receivedAt = receivedAt;
     }
 
     public IngestSource getIngestSource() {

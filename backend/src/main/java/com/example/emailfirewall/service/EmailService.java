@@ -23,6 +23,7 @@ public class EmailService {
     private final RuleRepository ruleRepository;
     private final UrlAnalysisService urlAnalysisService;
     private final AttachmentAnalysisService attachmentAnalysisService;
+    private final AiSpamDetectionService aiSpamDetectionService;
 
     public IngestResponse ingestJson(IngestEmailRequest req) {
         ParsedEmail p = new ParsedEmail();
@@ -74,7 +75,24 @@ public class EmailService {
         extraScore += extraSecurityScore(attachmentResult);
         persistAttachments(email, p);
 
-        int score = eval.getTotalScore() + authScore + extraScore;
+        AiSpamResult ai = aiSpamDetectionService.analyze(p);
+        email.setAiSpamScore(ai.spamScore());
+        email.setAiClassification(ai.classification());
+        email.setAiExplanation(ai.explanation());
+
+        int aiScore = ai.spamScore() != null ? ai.spamScore() : 0;
+
+        int aiContribution = 0;
+
+        if (aiScore >= 80) {
+            aiContribution = 40;
+        } else if (aiScore >= 60) {
+            aiContribution = 25;
+        } else if (aiScore >= 40) {
+            aiContribution = 10;
+        }
+
+        int score = eval.getTotalScore() + authScore + extraScore + aiContribution;
         EmailVerdict verdict = determineVerdict(score, eval.getForcedVerdict());
 
         email.setThreatScore(score);
