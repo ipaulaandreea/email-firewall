@@ -8,10 +8,13 @@ function normalizeResult(r) {
 function badgeClass(result) {
     switch (result) {
         case "PASS":
+        case "CLEAN":
             return "badge badgePass";
         case "FAIL":
+        case "SUSPICIOUS":
             return "badge badgeFail";
         case "SOFTFAIL":
+        case "WARNING":
             return "badge badgeWarn";
         case "NEUTRAL":
         case "NONE":
@@ -33,7 +36,81 @@ function Row({ label, result, children }) {
     );
 }
 
-export default function AuthResultsCard({ data }) {
+function SecurityAnalysis({ security }) {
+    if (!security) return null;
+
+    const urls = Array.isArray(security.urls) ? security.urls : [];
+    const attachments = Array.isArray(security.attachments) ? security.attachments : [];
+
+    return (
+        <>
+            <div className="cardTitle" style={{ marginTop: 20 }}>
+                URL & Attachment Analysis
+            </div>
+
+            <Row label="URLs" result={security.urlStatus || "NONE"}>
+                <div className="authMeta">
+                    <div>
+                        <span className="muted">suspicious:</span>{" "}
+                        {security.suspiciousUrlCount ?? 0}
+                    </div>
+
+                    {urls.length > 0 ? (
+                        <div className="authList">
+                            {urls.map((u, idx) => (
+                                <div key={idx} className="authSig">
+                                    <span className={badgeClass(normalizeResult(u.verdict))}>
+                                        {normalizeResult(u.verdict)}
+                                    </span>
+                                    <span className="authSigText">
+                                        {u.host || "-"}
+                                        {u.shortener ? " — shortener" : ""}
+                                        {u.url ? ` — ${u.url}` : ""}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="muted">No URLs detected.</div>
+                    )}
+                </div>
+            </Row>
+
+            <Row label="Attachments" result={security.attachmentStatus || "NONE"}>
+                <div className="authMeta">
+                    <div>
+                        <span className="muted">total:</span>{" "}
+                        {security.attachmentCount ?? 0}
+                        {" · "}
+                        <span className="muted">suspicious:</span>{" "}
+                        {security.suspiciousAttachmentCount ?? 0}
+                    </div>
+
+                    {attachments.length > 0 ? (
+                        <div className="authList">
+                            {attachments.map((a, idx) => (
+                                <div key={idx} className="authSig">
+                                    <span className={badgeClass(normalizeResult(a.verdict))}>
+                                        {normalizeResult(a.verdict)}
+                                    </span>
+                                    <span className="authSigText">
+                                        {a.filename || "-"}
+                                        {a.extension ? ` (.${a.extension})` : ""}
+                                        {a.sizeBytes ? ` — ${a.sizeBytes} bytes` : ""}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="muted">No attachments detected.</div>
+                    )}
+                </div>
+            </Row>
+        </>
+    );
+}
+
+export default function AuthResultsCard({ data, security }) {
     const details = useMemo(() => {
         if (!data) return null;
         return data.details || null;
@@ -74,7 +151,7 @@ export default function AuthResultsCard({ data }) {
                                         {normalizeResult(s?.result)}
                                     </span>
                                     <span className="authSigText">
-                                        {(s?.domain || "-")}
+                                        {s?.domain || "-"}
                                         {s?.selector ? ` (selector=${s.selector})` : ""}
                                         {s?.summary ? ` — ${s.summary}` : ""}
                                     </span>
@@ -88,7 +165,8 @@ export default function AuthResultsCard({ data }) {
             <Row label="DMARC" result={data.dmarcResult || dmarc?.result}>
                 <div className="authMeta">
                     <div>
-                        <span className="muted">policy:</span> {String(data.dmarcPolicy || dmarc?.policy || "-")}
+                        <span className="muted">policy:</span>{" "}
+                        {String(data.dmarcPolicy || dmarc?.policy || "-")}
                     </div>
                     {(dmarc?.spfAligned !== undefined || dmarc?.dkimAligned !== undefined) && (
                         <div>
@@ -100,10 +178,11 @@ export default function AuthResultsCard({ data }) {
                 </div>
             </Row>
 
+            <SecurityAnalysis security={security} />
+
             <div className="muted" style={{ marginTop: 10 }}>
                 Note: results are stored per email and contribute to the threat score.
             </div>
         </section>
     );
 }
-

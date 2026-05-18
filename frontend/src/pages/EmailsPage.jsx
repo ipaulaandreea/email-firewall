@@ -59,6 +59,9 @@ export default function EmailsPage() {
 
     const hasData = useMemo(() => Array.isArray(emails) && emails.length > 0, [emails]);
 
+    const [expandedSecurity, setExpandedSecurity] = useState(null);
+    const [expandedSecurityLoading, setExpandedSecurityLoading] = useState(false);
+
     useEffect(() => {
         let cancelled = false;
 
@@ -90,7 +93,7 @@ export default function EmailsPage() {
             setExpandedRuleHits(null);
             return;
         }
-
+        setExpandedSecurity(null);
         setExpandedEmailId(emailId);
 
         setExpandedAuth(null);
@@ -98,18 +101,26 @@ export default function EmailsPage() {
 
         setExpandedRuleHits(null);
         setExpandedRuleHitsLoading(true);
+        setExpandedSecurity(null);
+        setExpandedSecurityLoading(true);
 
         try {
-            const [auth, hits] = await Promise.all([
+            const [auth, hits, security] = await Promise.all([
                 fetchJson(`/api/emails/${emailId}/auth`, { method: "GET" }).catch((e) => ({ error: e?.message || String(e) })),
                 fetchJson(`/api/emails/${emailId}/rule-hits`, { method: "GET" }).catch((e) => ({ error: e?.message || String(e) })),
+                fetchJson(`/api/emails/${emailId}/security`, { method: "GET" }).catch((e) => ({ error: e?.message || String(e) })),
             ]);
+
+            setExpandedAuth(auth);
+            setExpandedRuleHits(hits);
+            setExpandedSecurity(security);
 
             setExpandedAuth(auth);
             setExpandedRuleHits(hits);
         } finally {
             setExpandedAuthLoading(false);
             setExpandedRuleHitsLoading(false);
+            setExpandedSecurityLoading(false);
         }
     }
 
@@ -142,7 +153,8 @@ export default function EmailsPage() {
                                     <th>SPF</th>
                                     <th>DKIM</th>
                                     <th>DMARC</th>
-                                    <th>Policy</th>
+                                    <th>URLs</th>
+                                    <th>Attachments</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -165,12 +177,30 @@ export default function EmailsPage() {
                                                 <td>{safe(e.spfResult)}</td>
                                                 <td>{safe(e.dkimResult)}</td>
                                                 <td>{safe(e.dmarcResult)}</td>
-                                                <td>{safe(e.dmarcPolicy)}</td>
+                                                <td>
+                                                    {e.urlStatus === "SUSPICIOUS" ? (
+                                                        <span className="badge badgeFail">Suspicious ({e.suspiciousUrlCount})</span>
+                                                    ) : e.urlStatus === "CLEAN" ? (
+                                                        <span className="badge badgePass">Clean</span>
+                                                    ) : (
+                                                        <span className="badge badgeNone">None</span>
+                                                    )}
+                                                </td>
+
+                                                <td>
+                                                    {e.attachmentStatus === "SUSPICIOUS" ? (
+                                                        <span className="badge badgeFail">Suspicious ({e.suspiciousAttachmentCount})</span>
+                                                    ) : e.attachmentStatus === "CLEAN" ? (
+                                                        <span className="badge badgePass">Clean ({e.attachmentCount})</span>
+                                                    ) : (
+                                                        <span className="badge badgeNone">None</span>
+                                                    )}
+                                                </td>
                                             </tr>
 
                                             {isExpanded && (
                                                 <tr key={`${e.emailId}-details`}>
-                                                    <td colSpan={9} style={{ padding: 0 }}>
+                                                    <td colSpan={10} style={{ padding: 0 }}>
                                                         <div style={{ padding: 14, display: "grid", gap: 14 }}>
                                                             <div>
                                                                 <div className="cardTitle" style={{ marginBottom: 10 }}>
@@ -184,8 +214,10 @@ export default function EmailsPage() {
                                                                     </div>
                                                                 )}
                                                                 {!expandedAuthLoading && expandedAuth && !expandedAuth?.error && (
-                                                                    <AuthResultsCard data={expandedAuth} />
-                                                                )}
+                                                                    <AuthResultsCard
+                                                                        data={expandedAuth}
+                                                                        security={expandedSecurityLoading ? null : expandedSecurity}
+                                                                    />                                                                )}
                                                             </div>
 
                                                             <div>

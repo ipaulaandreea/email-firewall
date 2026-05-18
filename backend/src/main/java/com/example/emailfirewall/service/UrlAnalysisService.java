@@ -5,7 +5,9 @@ import org.springframework.stereotype.Service;
 
 import java.net.IDN;
 import java.net.URI;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -17,6 +19,9 @@ public class UrlAnalysisService {
             "(https?://[^\\s\"'<>]+)",
             Pattern.CASE_INSENSITIVE
     );
+    private static final Pattern HREF_PATTERN =
+            Pattern.compile("href\\s*=\\s*['\"]([^'\"]+)['\"]",
+                    Pattern.CASE_INSENSITIVE);
 
     private static final Pattern IP_HOST = Pattern.compile("^\\d{1,3}(\\.\\d{1,3}){3}$");
 
@@ -26,22 +31,120 @@ public class UrlAnalysisService {
     );
 
     public FirewallScanResult analyze(ParsedEmail email) {
+
         FirewallScanResult result = new FirewallScanResult();
 
-        String content = safe(email != null ? email.bodyText : null)
-                + "\n"
-                + safe(email != null ? email.bodyHtml : null);
+        if (email == null) {
 
-        Matcher matcher = URL_PATTERN.matcher(content);
+            return result;
 
-        while (matcher.find()) {
-            String raw = cleanup(matcher.group(1));
-            analyzeUrl(raw, result);
         }
+
+        String content = safe(email.bodyText) + "\n" + safe(email.bodyHtml);
+
+        // 1. URL-uri plain text din bodyText/bodyHtml
+
+        Matcher urlMatcher = URL_PATTERN.matcher(content);
+
+        while (urlMatcher.find()) {
+
+            String raw = cleanup(urlMatcher.group(1));
+
+            analyzeUrl(raw, result);
+
+        }
+
+        // 2. URL-uri din href="..."
+
+        Pattern hrefPattern = Pattern.compile(
+
+                "href\\s*=\\s*[\"']([^\"']+)[\"']",
+
+                Pattern.CASE_INSENSITIVE
+
+        );
+
+        Matcher hrefMatcher = hrefPattern.matcher(content);
+
+        while (hrefMatcher.find()) {
+
+            String raw = cleanup(hrefMatcher.group(1));
+
+            if (raw.startsWith("http://") || raw.startsWith("https://")) {
+
+                analyzeUrl(raw, result);
+
+            }
+
+        }
+
+        // 3. Detectare mismatch între href și textul vizibil
 
         detectHrefMismatch(email, result);
 
+        // 4. Deduplicare linkuri după URL normalizat
+
+        deduplicateLinks(result);
+
         return result;
+
+    }
+
+    private void deduplicateLinks(FirewallScanResult result) {
+        if (result == null || result.getLinks() == null || result.getLinks().isEmpty()) {
+            return;
+        }
+
+        Map<String, ScannedLink> unique = new LinkedHashMap<>();
+
+        for (ScannedLink link : result.getLinks()) {
+            if (link == null) continue;
+
+            String key = link.urlNormalized != null && !link.urlNormalized.isBlank()
+                    ? link.urlNormalized
+                    : link.urlRaw;
+
+            if (key == null || key.isBlank()) continue;
+
+            ScannedLink existing = unique.get(key);
+
+            if (existing == null) {
+                unique.put(key, link);
+                continue;
+            }
+
+            existing.verdict = moreSevere(existing.verdict, link.verdict);
+
+            if (link.shortener) {
+                existing.shortener = true;
+            }
+
+            if (existing.host == null && link.host != null) {
+                existing.host = link.host;
+            }
+
+            if (link.signals != null && !link.signals.isEmpty()) {
+                existing.signals.addAll(link.signals);
+            }
+        }
+
+        result.getLinks().clear();
+        result.getLinks().addAll(unique.values());
+    }
+
+    private String moreSevere(String a, String b) {
+        return severityRank(b) > severityRank(a) ? b : a;
+    }
+
+    private int severityRank(String verdict) {
+        if (verdict == null) return 0;
+
+        return switch (verdict.toUpperCase()) {
+            case "SUSPICIOUS" -> 3;
+            case "WARNING" -> 2;
+            case "CLEAN" -> 1;
+            default -> 0;
+        };
     }
 
     private void analyzeUrl(String raw, FirewallScanResult result) {

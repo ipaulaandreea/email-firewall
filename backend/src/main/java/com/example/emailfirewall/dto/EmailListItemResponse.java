@@ -16,6 +16,10 @@ public record EmailListItemResponse(
         SpfResult spfResult,
         DkimResult dkimResult,
         DmarcResult dmarcResult,
-        DmarcPolicy dmarcPolicy
+        String urlStatus,
+        Integer suspiciousUrlCount,
+        String attachmentStatus,
+        Integer attachmentCount,
+        Integer suspiciousAttachmentCount
 ) {}
 

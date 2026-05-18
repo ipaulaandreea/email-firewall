@@ -29,6 +29,62 @@ public class EmailController {
         this.ruleHitRepository = ruleHitRepository;
     }
 
+    private String urlStatus(EmailEntity e) {
+        if (e.getLinks() == null || e.getLinks().isEmpty()) {
+            return "NONE";
+        }
+
+        boolean suspicious = e.getLinks().stream()
+                .anyMatch(l ->
+                        "SUSPICIOUS".equalsIgnoreCase(l.getVerdict())
+                                || "WARNING".equalsIgnoreCase(l.getVerdict())
+                );
+
+        return suspicious ? "SUSPICIOUS" : "CLEAN";
+    }
+
+    private int suspiciousUrlCount(EmailEntity e) {
+        if (e.getLinks() == null) return 0;
+
+        return (int) e.getLinks().stream()
+                .filter(l ->
+                        "SUSPICIOUS".equalsIgnoreCase(l.getVerdict())
+                                || "WARNING".equalsIgnoreCase(l.getVerdict())
+                )
+                .count();
+    }
+
+    private String attachmentStatus(EmailEntity e) {
+        if (e.getAttachments() == null || e.getAttachments().isEmpty()) {
+            return "NONE";
+        }
+
+        boolean suspicious = e.getAttachments().stream()
+                .anyMatch(a ->
+                        "SUSPICIOUS".equalsIgnoreCase(a.getVerdict())
+                                || "WARNING".equalsIgnoreCase(a.getVerdict())
+                );
+
+        return suspicious ? "SUSPICIOUS" : "CLEAN";
+    }
+
+    private int attachmentCount(EmailEntity e) {
+        if (e.getAttachments() == null) return 0;
+        return e.getAttachments().size();
+    }
+
+    private int suspiciousAttachmentCount(EmailEntity e) {
+        if (e.getAttachments() == null) return 0;
+
+        return (int) e.getAttachments().stream()
+                .filter(a ->
+                        "SUSPICIOUS".equalsIgnoreCase(a.getVerdict())
+                                || "WARNING".equalsIgnoreCase(a.getVerdict())
+                )
+                .count();
+    }
+
+
     @GetMapping
     public ResponseEntity<List<EmailListItemResponse>> listRecent() {
         List<EmailEntity> emails = emailRepository.findTop50ByOrderByReceivedAtDesc();
@@ -46,7 +102,11 @@ public class EmailController {
                     auth != null ? auth.getSpfResult() : null,
                     auth != null ? auth.getDkimResult() : null,
                     auth != null ? auth.getDmarcResult() : null,
-                    auth != null ? auth.getDmarcPolicy() : null
+                    urlStatus(e),
+                    suspiciousUrlCount(e),
+                    attachmentStatus(e),
+                    attachmentCount(e),
+                    suspiciousAttachmentCount(e)
             );
         }).toList();
 
@@ -104,5 +164,42 @@ public class EmailController {
         )).toList();
 
         return ResponseEntity.ok(out);
+    }
+
+    @GetMapping("/{id}/security")
+    public ResponseEntity<Map<String, Object>> getSecurityDetails(@PathVariable UUID id) {
+        EmailEntity email = emailRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Email not found"));
+
+        List<Map<String, Object>> urls = email.getLinks() == null
+                ? List.of()
+                : email.getLinks().stream().map(l -> Map.<String, Object>of(
+                "url", l.getUrlRaw(),
+                "host", l.getHost(),
+                "verdict", l.getVerdict(),
+                "shortener", Boolean.TRUE.equals(l.getShortener())
+        )).toList();
+
+        List<Map<String, Object>> attachments = email.getAttachments() == null
+                ? List.of()
+                : email.getAttachments().stream().map(a -> Map.<String, Object>of(
+                "filename", a.getFilename(),
+                "contentType", a.getContentType(),
+                "sizeBytes", a.getSizeBytes(),
+                "sha256", a.getSha256(),
+                "extension", a.getExtension(),
+                "verdict", a.getVerdict()
+        )).toList();
+
+        return ResponseEntity.ok(Map.of(
+                "emailId", email.getId(),
+                "urlStatus", urlStatus(email),
+                "suspiciousUrlCount", suspiciousUrlCount(email),
+                "urls", urls,
+                "attachmentStatus", attachmentStatus(email),
+                "attachmentCount", attachmentCount(email),
+                "suspiciousAttachmentCount", suspiciousAttachmentCount(email),
+                "attachments", attachments
+        ));
     }
 }
