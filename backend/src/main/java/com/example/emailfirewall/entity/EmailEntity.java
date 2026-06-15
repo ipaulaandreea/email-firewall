@@ -80,6 +80,26 @@ public class EmailEntity {
     @Column(nullable = false, length = 32)
     private EmailStatus status = EmailStatus.ANALYZED;
 
+    @Setter
+    @Getter
+    @Column(name = "imap_uid")
+    private Long imapUid;
+
+    @Setter
+    @Getter
+    @Column(name = "mailbox_folder", length = 255)
+    private String mailboxFolder;
+
+    @Setter
+    @Getter
+    @Column(name = "mailbox_provider", length = 64)
+    private String mailboxProvider;
+
+    @Setter
+    @Getter
+    @Column(name = "mailbox_username", length = 320)
+    private String mailboxUsername;
+
     @OneToMany(
             mappedBy = "email",
             cascade = CascadeType.ALL,
