@@ -105,7 +105,7 @@ export default function RuleEditorCard({
                             onChange={(e) => patchForm({ scoreDelta: e.target.value })}
                             disabled={!canManage}
                         />
-                        <div className="hint">Poate fi negativ (reduce scor).</div>
+                        <div className="hint">Can be negative (reduces score).</div>
                     </label>
                 )}
 

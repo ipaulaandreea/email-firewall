@@ -216,7 +216,7 @@ export default function EmailsPage() {
         <div className="page">
             <div
                 className="pageHeader">
-                <h1>Raport Emailuri</h1>
+                <h1>Emails Report</h1>
 
                 <button
                     className="moveSuspiciousBtn"
@@ -321,11 +321,17 @@ export default function EmailsPage() {
 
                                             <td onClick={(ev) => ev.stopPropagation()}>
                                                 {e.aiSpamScore == null ? (
-                                                    <button onClick={() => analyzeSpam(e.emailId)}>
-                                                        Analyze for spam
+                                                    <button
+                                                        className="spamBtn"
+                                                        onClick={() => analyzeSpam(e.emailId)}
+                                                    >
+                                                        AI Scan
                                                     </button>
                                                 ) : (
-                                                    <button onClick={() => analyzeSpam(e.emailId)}>
+                                                    <button
+                                                        className="spamBtn reanalyzeBtn"
+                                                        onClick={() => analyzeSpam(e.emailId)}
+                                                    >
                                                         Reanalyze
                                                     </button>
                                                 )}
@@ -521,7 +527,7 @@ export default function EmailsPage() {
 
             {!loading && !error && !hasData && (
                 <div className="notice">
-                    Nu există emailuri încă. Încearcă mai întâi un ingest din pagina Ingestion.
+                    No emails available yet. Try analyzing emails first from the Ingestion page.
                 </div>
             )}
         </div>

@@ -128,13 +128,12 @@ export default function IngestionPage() {
     return (
         <div className="page">
             <div className="pageHeader">
-                <h1>Ingestion</h1>
-                <p>Analyze mailbox emails or upload EML batch.</p>
+                <h1>Analyze Emails</h1>
             </div>
 
             <div className="cardsGrid">
                 <section className="card">
-                    <div className="cardTitle">Analyze Email</div>
+                    <div className="cardTitle">Analyze Email Address</div>
 
                     <form onSubmit={submitMailboxAnalyze} className="form">
                         <label>
@@ -173,13 +172,13 @@ export default function IngestionPage() {
                         </label>
 
                         <label>
-                            Limit (optional, default 50)
+                            Limit (optional, default 10)
                             <input
                                 type="number"
                                 min="1"
                                 max="200"
                                 value={mailboxForm.limit}
-                                placeholder="50"
+                                placeholder="10"
                                 onChange={(e) =>
                                     setMailboxForm((s) => ({ ...s, limit: e.target.value }))
                                 }
@@ -197,11 +196,10 @@ export default function IngestionPage() {
 
                 {canBatch && (
                     <section className="card">
-                        <div className="cardTitle">Ingest EML (batch)</div>
+                        <div className="cardTitle">Batch Ingest .eml Files </div>
 
                         <form onSubmit={submitBatch} className="form">
                             <label>
-                                Fișiere .eml (multiple)
                                 <input
                                     type="file"
                                     multiple
@@ -213,7 +211,7 @@ export default function IngestionPage() {
                             </label>
 
                             <div className="hint">
-                                Selectate: <b>{batchFiles.length}</b>
+                                Selected: <b>{batchFiles.length}</b>
                             </div>
 
                             <button

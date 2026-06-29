@@ -22,7 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @RequiredArgsConstructor
 public class MailboxFetchService {
 
-    private static final int DEFAULT_LIMIT = 50;
+    private static final int DEFAULT_LIMIT = 10;
 
     private final EmlParserService emlParserService;
     private final EmailService emailService;

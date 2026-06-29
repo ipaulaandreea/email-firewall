@@ -13,10 +13,6 @@ export default function RulesListCard({
     return (
         <section className="card">
             <div className="cardHead">
-                <div>
-                    <div className="cardTitle">Lista reguli</div>
-                    <p className="cardSubtitle">Ordinea efectivă este după priority (asc).</p>
-                </div>
 
                 <div className="cardActions">
                     <button className="btn btnGhost" onClick={onRefresh} disabled={loading}>
@@ -52,7 +48,6 @@ export default function RulesListCard({
                             <th>Target</th>
                             <th>Action</th>
                             <th>Pattern</th>
-                            <th>Priority</th>
                             {canManage && <th style={{ width: 140 }}>Actions</th>}
                         </tr>
                         </thead>
@@ -88,7 +83,6 @@ export default function RulesListCard({
 
                                     <td>
                                         <div className="cellMain">{r.name}</div>
-                                        <div className="cellSub monoInline">{r.id}</div>
                                     </td>
 
                                     <td>
@@ -113,7 +107,6 @@ export default function RulesListCard({
                                     </td>
 
                                     <td className="monoInline">{r.pattern}</td>
-                                    <td className="monoInline">{r.priority}</td>
 
                                     {canManage && (
                                         <td onClick={(e) => e.stopPropagation()}>

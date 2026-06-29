@@ -216,6 +216,57 @@ textarea {
     cursor: not-allowed;
 }
 
+.spamBtn {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: #dfe7f3;
+
+    border-radius: 999px;
+    padding: 6px 14px;
+
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    backdrop-filter: blur(4px);
+
+    min-width: 110px;
+}
+
+.spamBtn {
+    background: transparent;
+    border: 1px solid #4a5a78;
+    color: #dbe6f7;
+
+    border-radius: 18px;
+    padding: 4px 12px;
+
+    font-size: 12px;
+    font-weight: 700;
+
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.spamBtn:hover {
+    border-color: #6b82a8;
+    background: rgba(255,255,255,0.03);
+}
+
+/* optional, doar pt reanalyze */
+.reanalyzeBtn {
+    border-color: #8a6d3b;
+    color: #f3d9a2;
+}
+
+.reanalyzeBtn:hover {
+    background: rgba(255, 196, 0, 0.06);
+    border-color: #b38b45;
+}
+
 /* ---------- Response Boxes ---------- */
 
 .box {

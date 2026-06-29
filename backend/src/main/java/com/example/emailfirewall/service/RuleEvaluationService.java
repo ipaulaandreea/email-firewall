@@ -40,6 +40,10 @@ public class RuleEvaluationService {
 
             apply(rule, result);
 
+            if (result.isBypassTriggered()) {
+                break;
+            }
+
             if (result.getForcedVerdict() == EmailVerdict.BLOCK) {
                 break;
             }
@@ -80,6 +84,9 @@ public class RuleEvaluationService {
     }
 
     private void apply(RuleEntity rule, RuleEvaluationResult result) {
+        if (rule.getAction() == RuleAction.BYPASS) {
+            result.triggerBypass(rule, "Bypass de la regula: " + rule.getName());
+        }
         if (rule.getAction() == RuleAction.ADD_SCORE) {
             int delta = rule.getScoreDelta() != null ? rule.getScoreDelta() : 0;
             result.addScore(delta, rule, "Regulă declanșată: " + rule.getName());
@@ -89,10 +96,6 @@ public class RuleEvaluationService {
         if (rule.getAction() == RuleAction.SET_VERDICT && rule.getVerdict() != null) {
             result.forceVerdict(rule.getVerdict(), rule, "Verdict forțat de regula: " + rule.getName());
             return;
-        }
-
-        if (rule.getAction() == RuleAction.BYPASS) {
-            result.forceVerdict(EmailVerdict.ALLOW, rule, "Bypass de la regula: " + rule.getName());
         }
     }
 

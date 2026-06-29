@@ -89,7 +89,10 @@ public class EmailService {
         persistAttachments(email, p);
 
         int score = eval.getTotalScore() + authScore + extraScore;
-        EmailVerdict verdict = determineVerdict(score, eval.getForcedVerdict());
+        EmailVerdict forcedVerdict =
+                eval.isBypassTriggered() ? null : eval.getForcedVerdict();
+
+        EmailVerdict verdict = determineVerdict(score, forcedVerdict);
 
         email.setOwnerUsername(username);
         email.setThreatScore(score);
@@ -135,8 +138,6 @@ public class EmailService {
         email.setAiClassification(ai.classification());
         email.setAiExplanation(ai.explanation());
 
-        email.setThreatScore(newScore);
-        email.setVerdict(determineVerdict(newScore, null));
         EmailVerdict newVerdict = determineVerdict(newScore, null);
 
         email.setThreatScore(newScore);

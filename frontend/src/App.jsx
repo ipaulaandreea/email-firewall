@@ -33,16 +33,16 @@ function AppLayout() {
 
                 <nav className="nav">
                     <NavLink to="/ingestion" className={({ isActive }) => `navItem ${isActive ? "active" : ""}`}>
-                        Ingestion
+                        Analyze Emails
                     </NavLink>
                     <NavLink to="/emails" className={({ isActive }) => `navItem ${isActive ? "active" : ""}`}>
-                        Emails
+                        Emails Report
                     </NavLink>
                     <NavLink to="/rules" className={({ isActive }) => `navItem ${isActive ? "active" : ""}`}>
-                        Rules
+                        Rules Engine
                     </NavLink>
                 </nav>
-
+<div></div>
                 <button className="btn logoutBtn" onClick={logout}>
                     Logout
                 </button>
@@ -63,7 +63,7 @@ function NotFound() {
     return (
         <div className="page">
             <h1>404</h1>
-            <p>Pagina nu există.</p>
+            <p>Page not found</p>
         </div>
     );
 }
