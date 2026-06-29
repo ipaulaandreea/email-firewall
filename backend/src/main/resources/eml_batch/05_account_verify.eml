@@ -1,0 +1,15 @@
+From: "Security Team" <security@paypa1-support.com>
+To: user@example.com
+Subject: Verificare urgenta cont - actiune necesara
+Date: Mon, 29 Jun 2026 10:20:00 +0300
+Message-ID: <account-verify-005@example.test>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+Authentication-Results: mx.example.com; spf=fail smtp.mailfrom=paypa1-support.com; dkim=fail; dmarc=fail header.from=paypa1-support.com
+
+Am detectat activitate suspecta in contul tau.
+Pentru a evita suspendarea, verifica imediat parola si datele de login.
+
+https://paypa1-support.com/login/verify
+
+Daca nu confirmi in 30 de minute, contul va fi blocat.

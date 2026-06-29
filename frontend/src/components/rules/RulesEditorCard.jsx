@@ -21,8 +21,9 @@ export default function RuleEditorCard({
 
             <div className="form">
                 <label>
-                    Name
+                    Name *
                     <input
+                        required
                         value={form.name}
                         onChange={(e) => patchForm({ name: e.target.value })}
                         placeholder="ex: Block suspicious domain"
@@ -32,8 +33,9 @@ export default function RuleEditorCard({
 
                 <div className="row">
                     <label>
-                        Target
+                        Target *
                         <select
+                            required
                             className="select"
                             value={form.target}
                             onChange={(e) => patchForm({ target: e.target.value })}
@@ -48,8 +50,9 @@ export default function RuleEditorCard({
                     </label>
 
                     <label>
-                        Action
+                        Action *
                         <select
+                            required
                             className="select"
                             value={form.action}
                             onChange={(e) => patchForm({ action: e.target.value })}
@@ -75,8 +78,9 @@ export default function RuleEditorCard({
                 )}
 
                 <label>
-                    Pattern
+                    Pattern *
                     <input
+                        required
                         value={form.pattern}
                         onChange={(e) => patchForm({ pattern: e.target.value })}
                         placeholder={
@@ -93,21 +97,23 @@ export default function RuleEditorCard({
 
                 {form.action === "ADD_SCORE" && (
                     <label>
-                        Score Delta
+                        Score Delta *
                         <input
+                            required
                             type="number"
                             value={form.scoreDelta}
                             onChange={(e) => patchForm({ scoreDelta: e.target.value })}
                             disabled={!canManage}
                         />
-                        <div className="hint">Poate fi negativ (reduce scor).</div>
+                        <div className="hint">Can be negative (reduces score).</div>
                     </label>
                 )}
 
                 {form.action === "SET_VERDICT" && (
                     <label>
-                        Verdict
+                        Verdict *
                         <select
+                            required
                             className="select"
                             value={form.verdict}
                             onChange={(e) => patchForm({ verdict: e.target.value })}
@@ -124,19 +130,9 @@ export default function RuleEditorCard({
 
                 <div className="row">
                     <label>
-                        Priority
-                        <input
-                            type="number"
-                            value={form.priority}
-                            onChange={(e) => patchForm({ priority: e.target.value })}
-                            disabled={!canManage}
-                        />
-                        <div className="hint">Mai mic = rule mai devreme (ex: 1..999).</div>
-                    </label>
-
-                    <label>
-                        Enabled
+                        Enabled *
                         <select
+                            required
                             className="select"
                             value={form.enabled ? "true" : "false"}
                             onChange={(e) => patchForm({ enabled: e.target.value === "true" })}
@@ -168,19 +164,6 @@ export default function RuleEditorCard({
                     <div className="box error">
                         <div className="boxTitle">Eroare</div>
                         <pre className="mono">{saveErr}</pre>
-                    </div>
-                )}
-
-                {selectedRule && (
-                    <div
-                        className="box"
-                        style={{
-                            border: "1px solid rgba(255,255,255,0.10)",
-                            background: "rgba(10,25,47,0.55)",
-                        }}
-                    >
-                        <div className="boxTitle">Selected rule (server)</div>
-                        <pre className="mono">{pretty(selectedRule)}</pre>
                     </div>
                 )}
             </div>

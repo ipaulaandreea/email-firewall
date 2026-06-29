@@ -128,6 +128,14 @@
 
 .authLink:hover { text-decoration: underline; }
 
+.urlText {
+    display: inline-block;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
 @media (max-width: 520px) {
     .authCard { padding: 22px; }
 }

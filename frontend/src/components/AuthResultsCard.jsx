@@ -62,7 +62,7 @@ function SecurityAnalysis({ security }) {
                                     <span className={badgeClass(normalizeResult(u.verdict))}>
                                         {normalizeResult(u.verdict)}
                                     </span>
-                                    <span className="authSigText">
+                                    <span className="authSigText urlText">
                                         {u.host || "-"}
                                         {u.shortener ? " — shortener" : ""}
                                         {u.url ? ` — ${u.url}` : ""}

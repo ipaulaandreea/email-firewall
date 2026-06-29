@@ -2,13 +2,17 @@ package com.example.emailfirewall.controller;
 
 import com.example.emailfirewall.dto.EmailAuthDetailsResponse;
 import com.example.emailfirewall.dto.EmailListItemResponse;
+import com.example.emailfirewall.dto.IngestResponse;
 import com.example.emailfirewall.dto.RuleHitDto;
 import com.example.emailfirewall.entity.EmailEntity;
 import com.example.emailfirewall.repository.EmailRepository;
 import com.example.emailfirewall.repository.RuleHitRepository;
+import com.example.emailfirewall.service.EmailService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,11 +26,13 @@ public class EmailController {
     private final EmailRepository emailRepository;
     private final ObjectMapper objectMapper;
     private final RuleHitRepository ruleHitRepository;
+    private final EmailService emailService;
 
-    public EmailController(EmailRepository emailRepository, ObjectMapper objectMapper, RuleHitRepository ruleHitRepository) {
+    public EmailController(EmailRepository emailRepository, ObjectMapper objectMapper, RuleHitRepository ruleHitRepository, EmailService emailService) {
         this.emailRepository = emailRepository;
         this.objectMapper = objectMapper;
         this.ruleHitRepository = ruleHitRepository;
+        this.emailService = emailService;
     }
 
     private String urlStatus(EmailEntity e) {
@@ -87,7 +93,9 @@ public class EmailController {
 
     @GetMapping
     public ResponseEntity<List<EmailListItemResponse>> listRecent() {
-        List<EmailEntity> emails = emailRepository.findTop50ByOrderByReceivedAtDesc();
+        List<EmailEntity> emails = isAdmin()
+                ? emailRepository.findTop50ByOrderByReceivedAtDesc()
+                : emailRepository.findTop50ByOwnerUsernameOrderByReceivedAtDesc(currentUsername());
 
         List<EmailListItemResponse> out = emails.stream().map(e -> {
             var auth = e.getAuthResults();
@@ -115,10 +123,35 @@ public class EmailController {
         return ResponseEntity.ok(out);
     }
 
-    @GetMapping("/{id}/auth")
-    public ResponseEntity<EmailAuthDetailsResponse> getAuthDetails(@PathVariable("id") UUID id) {
+    private Authentication auth() {
+        return SecurityContextHolder.getContext().getAuthentication();
+    }
+
+    private String currentUsername() {
+        Authentication a = auth();
+        return a != null ? a.getName() : "anonymous";
+    }
+
+    private boolean isAdmin() {
+        Authentication a = auth();
+        return a != null && a.getAuthorities().stream()
+                .anyMatch(x -> "ROLE_ADMIN".equals(x.getAuthority()));
+    }
+
+    private EmailEntity getVisibleEmail(UUID id) {
         EmailEntity email = emailRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Email not found"));
+
+        if (!isAdmin() && !currentUsername().equals(email.getOwnerUsername())) {
+            throw new IllegalArgumentException("Email not found");
+        }
+
+        return email;
+    }
+
+    @GetMapping("/{id}/auth")
+    public ResponseEntity<EmailAuthDetailsResponse> getAuthDetails(@PathVariable("id") UUID id) {
+        EmailEntity email = getVisibleEmail(id);
 
         var auth = email.getAuthResults();
 
@@ -127,7 +160,6 @@ public class EmailController {
             try {
                 details = objectMapper.readValue(auth.getDetailsJson(), new TypeReference<>() {});
             } catch (Exception ignored) {
-                // If stored JSON is malformed, don't fail the request; just omit details.
                 details = null;
             }
         }
@@ -147,12 +179,10 @@ public class EmailController {
         return ResponseEntity.ok(resp);
     }
 
+
     @GetMapping("/{id}/rule-hits")
     public ResponseEntity<List<RuleHitDto>> getRuleHits(@PathVariable("id") UUID id) {
-        // ensure email exists
-        if (!emailRepository.existsById(id)) {
-            throw new IllegalArgumentException("Email not found");
-        }
+        getVisibleEmail(id);
 
         var hits = ruleHitRepository.findByEmail_IdOrderByHitAtAsc(id);
 
@@ -170,8 +200,7 @@ public class EmailController {
 
     @GetMapping("/{id}/security")
     public ResponseEntity<Map<String, Object>> getSecurityDetails(@PathVariable UUID id) {
-        EmailEntity email = emailRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Email not found"));
+        EmailEntity email = getVisibleEmail(id);
 
         List<Map<String, Object>> urls = email.getLinks() == null
                 ? List.of()
@@ -203,5 +232,11 @@ public class EmailController {
                 "suspiciousAttachmentCount", suspiciousAttachmentCount(email),
                 "attachments", attachments
         ));
+    }
+
+    @PostMapping("/{id}/analyze-spam")
+    public IngestResponse analyzeSpam(@PathVariable UUID id) {
+        getVisibleEmail(id);
+        return emailService.analyzeSpam(id);
     }
 }

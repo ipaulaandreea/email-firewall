@@ -77,6 +77,14 @@ body {
     padding: 30px;
 }
 
+.pageHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-inline: 12px;
+}
+
 .pageHeader h1 {
     margin: 0;
     font-size: 24px;
@@ -206,6 +214,57 @@ textarea {
 .btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+
+.spamBtn {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: #dfe7f3;
+
+    border-radius: 999px;
+    padding: 6px 14px;
+
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    backdrop-filter: blur(4px);
+
+    min-width: 110px;
+}
+
+.spamBtn {
+    background: transparent;
+    border: 1px solid #4a5a78;
+    color: #dbe6f7;
+
+    border-radius: 18px;
+    padding: 4px 12px;
+
+    font-size: 12px;
+    font-weight: 700;
+
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.spamBtn:hover {
+    border-color: #6b82a8;
+    background: rgba(255,255,255,0.03);
+}
+
+/* optional, doar pt reanalyze */
+.reanalyzeBtn {
+    border-color: #8a6d3b;
+    color: #f3d9a2;
+}
+
+.reanalyzeBtn:hover {
+    background: rgba(255, 196, 0, 0.06);
+    border-color: #b38b45;
 }
 
 /* ---------- Response Boxes ---------- */
@@ -464,4 +523,35 @@ textarea {
 
 .cellMono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas;
+}
+
+
+.moveSuspiciousBtn {
+    background: rgba(220,38,38,0.18);
+    border: 1px solid rgba(239,68,68,0.55);
+    color: #fecaca;
+
+    padding: 12px 18px;
+    border-radius: 14px;
+
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+    white-space: nowrap;
+
+    transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.moveSuspiciousBtn:hover {
+    background: rgba(220,38,38,0.28);
+    transform: translateY(-1px);
+}
+
+.moveSuspiciousBtn:active {
+    transform: translateY(0);
+}
+
+.moveSuspiciousBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }

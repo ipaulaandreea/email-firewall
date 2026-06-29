@@ -72,29 +72,101 @@ export default function EmailsPage() {
 
     const hasData = useMemo(() => Array.isArray(emails) && emails.length > 0, [emails]);
 
-    useEffect(() => {
-        let cancelled = false;
+    const [moving, setMoving] = useState(false);
+    const [spamLoadingId, setSpamLoadingId] = useState(null);
 
-        async function load() {
-            setLoading(true);
-            setError(null);
+    async function analyzeSpam(emailId) {
+        setSpamLoadingId(emailId);
 
-            try {
-                const data = await fetchJson("/api/emails", { method: "GET" });
-                if (!cancelled) setEmails(Array.isArray(data) ? data : []);
-            } catch (e) {
-                if (!cancelled) setError(e);
-            } finally {
-                if (!cancelled) setLoading(false);
+        try {
+            const token = localStorage.getItem("token");
+
+            const res = await fetch(`/api/emails/${emailId}/analyze-spam`, {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+            if (!res.ok) {
+                throw new Error("Spam analysis failed");
             }
+
+            const data = await res.json();
+            console.log(data);
+
+            await loadEmails();
+
+        } catch (err) {
+            console.error(err);
+            alert("Could not analyze spam");
+        } finally {
+            setSpamLoadingId(null);
         }
+    }
 
-        void load();
+    async function loadEmails() {
+        setLoading(true);
+        setError(null);
 
-        return () => {
-            cancelled = true;
-        };
+        try {
+            const data = await fetchJson("/api/emails", { method: "GET" });
+            setEmails(Array.isArray(data) ? data : []);
+        } catch (e) {
+            setError(e);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    useEffect(() => {
+        void loadEmails();
     }, []);
+
+    async function moveSuspiciousEmails() {
+        try {
+            setMoving(true);
+
+            const token = localStorage.getItem("token");
+            const mailboxConfig = JSON.parse(localStorage.getItem("mailboxConfig") || "null");
+
+            if (!mailboxConfig?.host || !mailboxConfig?.username || !mailboxConfig?.password) {
+                throw new Error("Lipsește configurația IMAP. Rulează întâi Analyze Email din Ingestion.");
+            }
+
+            const res = await fetch("/api/mailbox/fetch", {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(mailboxConfig),
+            });
+
+            const text = await res.text();
+            const data = text ? JSON.parse(text) : null;
+
+            if (!res.ok) {
+                throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
+            }
+
+            alert("Suspicious emails moved successfully.");
+            await loadEmails();
+        } catch (e) {
+            alert(e.message || "Move failed");
+        } finally {
+            setMoving(false);
+        }
+    }
+
+    function statusBadgeClass(status) {
+        if (status === "QUARANTINED") return "badge badgeFail";
+        if (status === "ANALYZED") return "badge badgePass";
+        if (status === "RECEIVED" || status === "PARSED") return "badge badgeWarn";
+        if (status === "DELETED") return "badge badgeFail";
+        if (status === "RELEASED") return "badge badgePass";
+        return "badge badgeNone";
+    }
 
     async function toggleExpand(emailId) {
         if (!emailId) return;
@@ -142,14 +214,18 @@ export default function EmailsPage() {
 
     return (
         <div className="page">
-            <div className="pageHeader">
-                <h1>Emails</h1>
-                <p>
-                    Ultimele 50 emailuri ingerate + rezumat SPF/DKIM/DMARC, URL,
-                    attachments și AI spam detection. Click pe un rând pentru detalii.
-                </p>
-            </div>
+            <div
+                className="pageHeader">
+                <h1>Emails Report</h1>
 
+                <button
+                    className="moveSuspiciousBtn"
+                    onClick={moveSuspiciousEmails}
+                    disabled={moving}
+                >
+                    {moving ? "Moving..." : "→ Move suspicious emails from inbox"}
+                </button>
+            </div>
             {loading && <div className="notice">Loading...</div>}
 
             {error && (
@@ -170,6 +246,7 @@ export default function EmailsPage() {
                                 <th>Subject</th>
                                 <th>Score</th>
                                 <th>Verdict</th>
+                                <th>Status</th>
                                 <th>SPF</th>
                                 <th>DKIM</th>
                                 <th>DMARC</th>
@@ -177,6 +254,7 @@ export default function EmailsPage() {
                                 <th>Attachments</th>
                                 <th>AI</th>
                                 <th>Classification</th>
+                                <th>Actions</th>
                             </tr>
                             </thead>
 
@@ -198,6 +276,11 @@ export default function EmailsPage() {
                                             <td>{safe(e.subject)}</td>
                                             <td className="cellMono">{safe(e.threatScore)}</td>
                                             <td>{safe(e.verdict)}</td>
+                                            <td>
+                                            <span className={statusBadgeClass(e.status)}>
+                                                {safe(e.status)}
+                                            </span>
+                                            </td>
                                             <td>{safe(e.spfResult)}</td>
                                             <td>{safe(e.dkimResult)}</td>
                                             <td>{safe(e.dmarcResult)}</td>
@@ -235,11 +318,29 @@ export default function EmailsPage() {
                                             </td>
 
                                             <td>{safe(e.aiClassification)}</td>
+
+                                            <td onClick={(ev) => ev.stopPropagation()}>
+                                                {e.aiSpamScore == null ? (
+                                                    <button
+                                                        className="spamBtn"
+                                                        onClick={() => analyzeSpam(e.emailId)}
+                                                    >
+                                                        AI Scan
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        className="spamBtn reanalyzeBtn"
+                                                        onClick={() => analyzeSpam(e.emailId)}
+                                                    >
+                                                        Reanalyze
+                                                    </button>
+                                                )}
+                                            </td>
                                         </tr>
 
                                         {isExpanded && (
                                             <tr key={`${e.emailId}-details`}>
-                                                <td colSpan={12} style={{ padding: 0 }}>
+                                                <td colSpan={14} style={{ padding: 0 }}>
                                                     <div
                                                         style={{
                                                             padding: 14,
@@ -426,7 +527,7 @@ export default function EmailsPage() {
 
             {!loading && !error && !hasData && (
                 <div className="notice">
-                    Nu există emailuri încă. Încearcă mai întâi un ingest din pagina Ingestion.
+                    No emails available yet. Try analyzing emails first from the Ingestion page.
                 </div>
             )}
         </div>

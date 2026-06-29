@@ -6,12 +6,15 @@ import com.example.emailfirewall.enums.*;
 import com.example.emailfirewall.repository.EmailRepository;
 import com.example.emailfirewall.repository.RuleRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.util.HtmlUtils;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -20,7 +23,6 @@ public class EmailService {
     private final EmailRepository emailRepository;
     private final RuleEvaluationService ruleEvaluationService;
     private final EmailAuthService emailAuthService;
-    private final RuleRepository ruleRepository;
     private final UrlAnalysisService urlAnalysisService;
     private final AttachmentAnalysisService attachmentAnalysisService;
     private final AiSpamDetectionService aiSpamDetectionService;
@@ -41,11 +43,21 @@ public class EmailService {
         return ingestParsedEmail(p, IngestSource.JSON_API);
     }
 
+    @Transactional
     public IngestResponse ingestParsedEmail(ParsedEmail p, IngestSource source) {
         if (p == null) p = new ParsedEmail();
 
+        String username = currentUsername();
+        String dedupeKey = username + ":" + buildDedupeKey(p);
+
+        Optional<EmailEntity> existing = emailRepository.findByDedupeKey(dedupeKey);
+        if (existing.isPresent()) {
+            return buildIngestResponse(existing.get());
+        }
+
         EmailEntity email = new EmailEntity();
         email.setId(UUID.randomUUID());
+        email.setDedupeKey(dedupeKey);
         email.setIngestSource(source);
         email.setFromAddress(p.from != null ? p.from : "unknown");
         email.setFromDomain(extractDomain(p.from));
@@ -65,6 +77,7 @@ public class EmailService {
 
         EmailAuthEvaluation auth = safeAuthEvaluate(p);
         int authScore = authScore(auth);
+
         int extraScore = 0;
 
         FirewallScanResult urlResult = urlAnalysisService.analyze(p);
@@ -75,41 +88,80 @@ public class EmailService {
         extraScore += extraSecurityScore(attachmentResult);
         persistAttachments(email, p);
 
-        AiSpamResult ai = aiSpamDetectionService.analyze(p);
-        email.setAiSpamScore(ai.spamScore());
-        email.setAiClassification(ai.classification());
-        email.setAiExplanation(ai.explanation());
+        int score = eval.getTotalScore() + authScore + extraScore;
+        EmailVerdict forcedVerdict =
+                eval.isBypassTriggered() ? null : eval.getForcedVerdict();
 
-        int aiScore = ai.spamScore() != null ? ai.spamScore() : 0;
+        EmailVerdict verdict = determineVerdict(score, forcedVerdict);
 
-        int aiContribution = 0;
-
-        if (aiScore >= 80) {
-            aiContribution = 40;
-        } else if (aiScore >= 60) {
-            aiContribution = 25;
-        } else if (aiScore >= 40) {
-            aiContribution = 10;
-        }
-
-        int score = eval.getTotalScore() + authScore + extraScore + aiContribution;
-        EmailVerdict verdict = determineVerdict(score, eval.getForcedVerdict());
-
+        email.setOwnerUsername(username);
         email.setThreatScore(score);
         email.setVerdict(verdict);
-        email.setStatus(verdict == EmailVerdict.QUARANTINE ? EmailStatus.QUARANTINED : EmailStatus.ANALYZED);
-
+        email.setStatus(EmailStatus.ANALYZED);
         persistRuleHits(email, eval);
         persistAuthResults(email, auth);
 
         EmailEntity saved = emailRepository.save(email);
+        return buildIngestResponse(saved);
+    }
 
+    private String currentUsername() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+
+        if (auth == null || auth.getName() == null || auth.getName().isBlank()) {
+            return "anonymous";
+        }
+
+        return auth.getName();
+    }
+
+    @Transactional
+    public IngestResponse analyzeSpam(UUID emailId) {
+        EmailEntity email = emailRepository.findById(emailId)
+                .orElseThrow(() -> new IllegalArgumentException("Email not found: " + emailId));
+
+        ParsedEmail parsed = new ParsedEmail();
+        parsed.from = email.getFromAddress();
+        parsed.subject = email.getSubject();
+        parsed.bodyText = email.getBodyText();
+        parsed.bodyHtml = null;
+
+        AiSpamResult ai = aiSpamDetectionService.analyze(parsed);
+
+        int currentScore = email.getThreatScore() != null ? email.getThreatScore() : 0;
+        int aiRawScore = ai.spamScore() != null ? ai.spamScore() : 0;
+
+        int aiPartialScore = calculateAiContribution(aiRawScore);
+        int newScore = currentScore + aiPartialScore;
+
+        email.setAiSpamScore(aiPartialScore);
+        email.setAiClassification(ai.classification());
+        email.setAiExplanation(ai.explanation());
+
+        EmailVerdict newVerdict = determineVerdict(newScore, null);
+
+        email.setThreatScore(newScore);
+        email.setVerdict(newVerdict);
+
+        EmailEntity saved = emailRepository.save(email);
+        return buildIngestResponse(saved);
+    }
+
+    private IngestResponse buildIngestResponse(EmailEntity email) {
         return new IngestResponse(
-                saved.getId(),
-                saved.getThreatScore(),
-                saved.getVerdict(),
-                saved.getStatus()
+                email.getId(),
+                email.getThreatScore(),
+                email.getVerdict(),
+                email.getStatus()
         );
+    }
+
+    private int calculateAiContribution(Integer aiScore) {
+        if (aiScore == null) return 0;
+        if (aiScore >= 80) return 40;
+        if (aiScore >= 60) return 25;
+        if (aiScore >= 40) return 10;
+        return 0;
     }
 
     private EmailAuthEvaluation safeAuthEvaluate(ParsedEmail p) {
@@ -123,7 +175,6 @@ public class EmailService {
     private int extraSecurityScore(FirewallScanResult result) {
         if (result == null) return 0;
         return Math.max(0, result.getScore());
-
     }
 
     private void persistAttachments(EmailEntity email, ParsedEmail p) {
@@ -198,9 +249,7 @@ public class EmailService {
         }
 
         for (RuleEvaluationResult.RuleHit hit : eval.getHits()) {
-            if (hit == null || hit.rule() == null) {
-                continue;
-            }
+            if (hit == null || hit.rule() == null) continue;
 
             RuleHitEntity e = new RuleHitEntity();
             e.setEmail(email);
@@ -256,10 +305,6 @@ public class EmailService {
         if (email.getLinks() == null) email.setLinks(new ArrayList<>());
     }
 
-    private UUID stableId(String name) {
-        return UUID.nameUUIDFromBytes(("email-firewall:" + name).getBytes());
-    }
-
     private EmailVerdict determineVerdict(int score, EmailVerdict forced) {
         if (forced != null) return forced;
         if (score >= 70) return EmailVerdict.BLOCK;
@@ -280,8 +325,34 @@ public class EmailService {
         return email.substring(at + 1).replace(">", "").trim().toLowerCase();
     }
 
-    private String fallback(String value, String fallback) {
-        return value != null ? value : fallback;
+    private String buildDedupeKey(ParsedEmail parsed) {
+        String raw =
+                safe(parsed != null ? parsed.from : null) + "|" +
+                        safe(parsed != null ? parsed.subject : null) + "|" +
+                        safe(parsed != null ? parsed.bodyText : null) + "|" +
+                        safe(parsed != null ? parsed.bodyHtml : null);
+
+        return sha256(raw.toLowerCase());
+    }
+
+    private String sha256(String input) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+
+            StringBuilder sb = new StringBuilder();
+            for (byte b : hash) {
+                sb.append(String.format("%02x", b));
+            }
+
+            return sb.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private String safe(String s) {
+        return s == null ? "" : s.trim();
     }
 
     static class AuthResultsJsonBuilder {
@@ -301,6 +372,7 @@ public class EmailService {
             sb.append("\"result\":\"").append(a.dkimResult).append("\"");
             if (a.dkimSummary != null) sb.append(",\"summary\":\"").append(escape(a.dkimSummary)).append("\"");
             sb.append(",\"signatures\":[");
+
             if (a.dkimSignatures != null) {
                 for (int i = 0; i < a.dkimSignatures.size(); i++) {
                     var s = a.dkimSignatures.get(i);
@@ -313,6 +385,7 @@ public class EmailService {
                     sb.append('}');
                 }
             }
+
             sb.append("]},");
 
             sb.append("\"dmarc\":{");
@@ -329,7 +402,10 @@ public class EmailService {
 
         private static String escape(String s) {
             if (s == null) return "";
-            return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
+            return s.replace("\\", "\\\\")
+                    .replace("\"", "\\\"")
+                    .replace("\n", "\\n")
+                    .replace("\r", "\\r");
         }
     }
 }

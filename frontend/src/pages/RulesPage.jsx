@@ -131,13 +131,33 @@ export default function RulesPage() {
         setForm((prev) => ({ ...prev, ...p }));
     }
 
+    function validateRule(f) {
+        if (!f.name?.trim()) return "Name is required.";
+        if (!f.target) return "Target is required.";
+        if (!f.action) return "Action is required.";
+        if (!f.pattern?.trim()) return "Pattern is required.";
+        if (!f.priority || Number(f.priority) < 1) return "Priority must be at least 1.";
+
+        if (
+            f.action === "ADD_SCORE" &&
+            (f.scoreDelta === "" || f.scoreDelta === null || f.scoreDelta === undefined)
+        ) {
+            return "Score Delta is required for ADD_SCORE.";
+        }
+
+        if (f.action === "SET_VERDICT" && !f.verdict) {
+            return "Verdict is required for SET_VERDICT.";
+        }
+
+        return null;
+    }
+
     function normalizeBeforeSend(f) {
         const payload = {
             name: (f.name ?? "").trim(),
             target: f.target,
             action: f.action,
             pattern: f.pattern ?? "",
-            priority: Number.isFinite(+f.priority) ? +f.priority : 100,
             enabled: !!f.enabled,
             scoreDelta: null,
             verdict: null,
@@ -158,7 +178,10 @@ export default function RulesPage() {
         setSaveOk(null);
 
         try {
-            if (!canManage) throw new Error("Nu ai permisiuni pentru a modifica reguli.");
+            if (!canManage) throw new Error("You do not have permission to modify rules.");
+
+            const validationError = validateRule(form);
+            if (validationError) throw new Error(validationError);
 
             const payload = normalizeBeforeSend(form);
 
@@ -171,7 +194,7 @@ export default function RulesPage() {
                 body: JSON.stringify(payload),
             });
 
-            setSaveOk(isUpdate ? "Regula a fost actualizată." : "Regula a fost creată.");
+            setSaveOk(isUpdate ? "Rule updated successfully." : "Rule created successfully.");
             await loadRules();
 
             if (saved?.id) {
@@ -187,7 +210,7 @@ export default function RulesPage() {
     async function deleteRule(rule) {
         if (!canManage) return;
 
-        const ok = confirm(`Ștergi regula "${rule?.name || "Unnamed"}"?`);
+        const ok = confirm(`Delete rule "${rule?.name || "Unnamed"}"?`);
         if (!ok) return;
 
         setSaveErr(null);
@@ -195,7 +218,7 @@ export default function RulesPage() {
 
         try {
             await fetchJson(`/api/rules/${rule.id}`, { method: "DELETE" });
-            setSaveOk("Regula a fost ștearsă.");
+            setSaveOk("Rule deleted successfully.");
             if (selectedId === rule.id) {
                 setSelectedId(null);
                 setForm({ ...emptyRule });
@@ -227,26 +250,38 @@ export default function RulesPage() {
     }
 
     const actionHint = useMemo(() => {
-        if (form.action === "ADD_SCORE") return "Scorul se adună la evaluare.";
-        if (form.action === "SET_VERDICT") return "Forțează verdictul (ALLOW/BLOCK).";
-        if (form.action === "BYPASS") return "Whitelist: forțează ALLOW indiferent de rest.";
+        if (form.action === "ADD_SCORE")
+            return "The score will be added during evaluation";
+
+        if (form.action === "SET_VERDICT")
+            return "Force a final verdict (ALLOW / BLOCK / QUARANTINE)";
+
+        if (form.action === "BYPASS")
+            return "Stop further rule evaluation and allow the message";
+
         return "";
     }, [form.action]);
 
     const targetHint = useMemo(() => {
-        if (form.target === "ATTACHMENT_EXT") return "Pattern: listă extensii separate prin virgulă (ex: pdf,exe,js)";
-        if (form.target === "ATTACHMENT_SIZE") return "Pattern: max:<bytes> (ex: max:1048576 pentru 1MB)";
-        if (form.target === "SUBJECT" || form.target === "BODY") return "Poți folosi: kw:oferta (substring) sau regex.";
-        if (form.target === "SENDER_EMAIL") return "Match exact email (case-insensitive).";
-        if (form.target === "SENDER_DOMAIN") return "Match domeniu sau subdomeniu (ex: example.com).";
+        if (form.target === "ATTACHMENT_EXT")
+            return "Pattern: comma-separated extensions (e.g. pdf, exe, js)";
+
+        if (form.target === "ATTACHMENT_SIZE")
+            return "Pattern: max:<bytes> (e.g. max:1048576 for 1MB)";
+
+        if (form.target === "SENDER_EMAIL")
+            return "Exact email match (case-insensitive).";
+
+        if (form.target === "SENDER_DOMAIN")
+            return "Domain or subdomain match (e.g. example.com).";
+
         return "";
     }, [form.target]);
 
     return (
         <div className="page">
             <div className="pageHeader">
-                <h1>Rules</h1>
-                <p>Gestionează regulile (whitelist / blacklist / scoring) pentru evaluarea emailurilor.</p>
+                <h1>Rules Engine</h1>
             </div>
 
             {canManage ? (

@@ -18,6 +18,17 @@ public class RuleEvaluationResult {
     private int totalScore;
     private EmailVerdict forcedVerdict;
     private final List<RuleHit> hits = new ArrayList<>();
+    private boolean bypassTriggered;
+
+    public boolean isBypassTriggered() {
+        return bypassTriggered;
+    }
+
+    public void triggerBypass(RuleEntity rule, String message) {
+        bypassTriggered = true;
+        hits.add(new RuleHit(rule, 0, null, message));
+    }
+
 
     public int getTotalScore() {
         return totalScore;
