@@ -125,15 +125,18 @@ public class EmailService {
 
         AiSpamResult ai = aiSpamDetectionService.analyze(parsed);
 
-        email.setAiSpamScore(ai.spamScore());
+        int currentScore = email.getThreatScore() != null ? email.getThreatScore() : 0;
+        int aiRawScore = ai.spamScore() != null ? ai.spamScore() : 0;
+
+        int aiPartialScore = calculateAiContribution(aiRawScore);
+        int newScore = currentScore + aiPartialScore;
+
+        email.setAiSpamScore(aiPartialScore);
         email.setAiClassification(ai.classification());
         email.setAiExplanation(ai.explanation());
 
-        int currentScore = email.getThreatScore() != null ? email.getThreatScore() : 0;
-        int aiScore = ai.spamScore() != null ? ai.spamScore() : 0;
-
-        int newScore = Math.max(currentScore, aiScore);
-
+        email.setThreatScore(newScore);
+        email.setVerdict(determineVerdict(newScore, null));
         EmailVerdict newVerdict = determineVerdict(newScore, null);
 
         email.setThreatScore(newScore);
