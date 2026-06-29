@@ -1,6 +1,5 @@
-import { useMemo, useState } from "react";
-import { hasRole, getRole } from "../utils/auth";
-import AuthResultsCard from "../components/AuthResultsCard";
+import { useState } from "react";
+import {hasRole} from "../utils/auth.js";
 
 function pretty(obj) {
     try {
@@ -11,55 +10,49 @@ function pretty(obj) {
 }
 
 export default function IngestionPage() {
-    const canBatch = hasRole("ADMIN");
-    const canJson = hasRole("ADMIN", "DEVELOPER");
-    const canEmlSingle = hasRole("ADMIN", "ANALYST", "DEVELOPER");
-    const role = getRole();
-
-    const [jsonForm, setJsonForm] = useState({
-        subject: "Test JSON",
-        body: "Hello",
-        from: "alice@example.com",
-        to: "bob@example.com",
+    const [mailboxForm, setMailboxForm] = useState({
+        host: "imap.gmail.com",
+        username: "",
+        password: "",
+        limit: "",
     });
-    const [jsonLoading, setJsonLoading] = useState(false);
-    const [jsonError, setJsonError] = useState(null);
-    const [jsonResult, setJsonResult] = useState(null);
-    const [jsonAuth, setJsonAuth] = useState(null);
+    const canBatch = hasRole("ADMIN");
 
-    const [emlFile, setEmlFile] = useState(null);
-    const [emlLoading, setEmlLoading] = useState(false);
-    const [emlError, setEmlError] = useState(null);
-    const [emlResult, setEmlResult] = useState(null);
-    const [emlAuth, setEmlAuth] = useState(null);
+    const [mailboxLoading, setMailboxLoading] = useState(false);
+    const [mailboxError, setMailboxError] = useState(null);
+    const [mailboxResult, setMailboxResult] = useState(null);
 
     const [batchFiles, setBatchFiles] = useState([]);
     const [batchLoading, setBatchLoading] = useState(false);
     const [batchError, setBatchError] = useState(null);
     const [batchResult, setBatchResult] = useState(null);
 
-    const hasBatch = useMemo(() => batchFiles && batchFiles.length > 0, [batchFiles]);
-
     async function fetchJson(url, options = {}) {
         const token = localStorage.getItem("token");
 
         const headers = new Headers(options.headers || {});
         if (token) headers.set("Authorization", `Bearer ${token}`);
+        if (options.body && !headers.has("Content-Type") && !(options.body instanceof FormData)) {
+            headers.set("Content-Type", "application/json");
+        }
 
         const res = await fetch(url, { ...options, headers });
-
         const text = await res.text();
+
         let data = null;
-        try { data = text ? JSON.parse(text) : null; }
-        catch { data = text || null; }
+        try {
+            data = text ? JSON.parse(text) : null;
+        } catch {
+            data = text || null;
+        }
 
         if (!res.ok) {
-            const msg =
-                (data && data.message) ||
-                (data && data.error) ||
+            const err = new Error(
+                data?.message ||
+                data?.error ||
                 (typeof data === "string" ? data : null) ||
-                `HTTP ${res.status}`;
-            const err = new Error(msg);
+                `HTTP ${res.status}`
+            );
             err.status = res.status;
             err.data = data;
             throw err;
@@ -68,93 +61,43 @@ export default function IngestionPage() {
         return data;
     }
 
-    async function loadAuthForEmailId(emailId) {
-        if (!emailId) return null;
-        try {
-            return await fetchJson(`/api/emails/${emailId}/auth`, { method: "GET" });
-        } catch {
-            return null;
-        }
-    }
-
-    async function submitJson(e) {
-        const token = localStorage.getItem("token");
+    async function submitMailboxAnalyze(e) {
         e.preventDefault();
-        setJsonError(null);
-        setJsonResult(null);
-        setJsonAuth(null);
 
-        setJsonLoading(true);
+        setMailboxLoading(true);
+        setMailboxError(null);
+        setMailboxResult(null);
+
         try {
-            const payload = {
-                subject: jsonForm.subject,
-                bodyText: jsonForm.body,
-                from: jsonForm.from,
-                to: jsonForm.to ? [jsonForm.to] : [],
-            };
-
-            const data = await fetchJson("/api/ingest/json", {
+            const data = await fetchJson("/api/mailbox/analyze", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify(payload),
+                body: JSON.stringify({
+                    host: mailboxForm.host,
+                    username: mailboxForm.username,
+                    password: mailboxForm.password,
+                    limit: mailboxForm.limit ? Number(mailboxForm.limit) : null,
+                }),
             });
 
-            setJsonResult(data);
-            const auth = await loadAuthForEmailId(data?.emailId);
-            setJsonAuth(auth);
+            localStorage.setItem(
+                "mailboxConfig",
+                JSON.stringify({
+                    host: mailboxForm.host,
+                    username: mailboxForm.username,
+                    password: mailboxForm.password,
+                    limit: mailboxForm.limit ? Number(mailboxForm.limit) : null,
+                })
+            );
+            setMailboxResult(data);
         } catch (err) {
-            setJsonError(err);
+            setMailboxError(err);
         } finally {
-            setJsonLoading(false);
-        }
-    }
-
-    async function submitEml(e) {
-        const token = localStorage.getItem("token");
-        e.preventDefault();
-        setEmlError(null);
-        setEmlResult(null);
-        setEmlAuth(null);
-
-        if (!emlFile) {
-            setEmlError(new Error("Selectează un fișier .eml"));
-            return;
-        }
-
-        setEmlLoading(true);
-        try {
-            const fd = new FormData();
-            fd.append("file", emlFile);
-
-            const data = await fetchJson("/api/ingest/eml", {
-                method: "POST",
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-                body: fd,
-            });
-
-            setEmlResult(data);
-            const auth = await loadAuthForEmailId(data?.emailId);
-            setEmlAuth(auth);
-        } catch (err) {
-            setEmlError(err);
-        } finally {
-            setEmlLoading(false);
+            setMailboxLoading(false);
         }
     }
 
     async function submitBatch(e) {
         e.preventDefault();
-
-        const token = localStorage.getItem("token");
-        if (!token) {
-            setBatchError({ message: "Not logged in (missing token)" });
-            return;
-        }
 
         if (!batchFiles?.length) {
             setBatchError({ message: "Selectează cel puțin un fișier .eml" });
@@ -169,20 +112,10 @@ export default function IngestionPage() {
             const fd = new FormData();
             batchFiles.forEach((f) => fd.append("files", f));
 
-            const res = await fetch("/api/ingest/eml/batch", {
+            const data = await fetchJson("/api/ingest/eml/batch", {
                 method: "POST",
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
                 body: fd,
             });
-
-            const text = await res.text();
-            const data = text ? JSON.parse(text) : null;
-
-            if (!res.ok) {
-                throw { message: `HTTP ${res.status}`, data };
-            }
 
             setBatchResult(data);
         } catch (err) {
@@ -196,87 +129,74 @@ export default function IngestionPage() {
         <div className="page">
             <div className="pageHeader">
                 <h1>Ingestion</h1>
-                <p>Upload JSON / EML single / EML batch.</p>
+                <p>Analyze mailbox emails or upload EML batch.</p>
             </div>
 
             <div className="cardsGrid">
-                {canJson && (
-                    <section className="card">
-                        <div className="cardTitle">Ingest JSON</div>
+                <section className="card">
+                    <div className="cardTitle">Analyze Email</div>
 
-                        <form onSubmit={submitJson} className="form">
-                            <label>
-                                Subject
-                                <input
-                                    value={jsonForm.subject}
-                                    onChange={(e) => setJsonForm((s) => ({ ...s, subject: e.target.value }))}
-                                />
-                            </label>
+                    <form onSubmit={submitMailboxAnalyze} className="form">
+                        <label>
+                            IMAP Host
+                            <input
+                                value={mailboxForm.host}
+                                onChange={(e) =>
+                                    setMailboxForm((s) => ({ ...s, host: e.target.value }))
+                                }
+                                placeholder="imap.gmail.com"
+                            />
+                        </label>
 
-                            <label>
-                                Body
-                                <textarea
-                                    rows={6}
-                                    value={jsonForm.body}
-                                    onChange={(e) => setJsonForm((s) => ({ ...s, body: e.target.value }))}
-                                />
-                            </label>
+                        <label>
+                            Email address
+                            <input
+                                type="email"
+                                value={mailboxForm.username}
+                                onChange={(e) =>
+                                    setMailboxForm((s) => ({ ...s, username: e.target.value }))
+                                }
+                                placeholder="your.email@gmail.com"
+                            />
+                        </label>
 
-                            <div className="row">
-                                <label>
-                                    From
-                                    <input
-                                        value={jsonForm.from}
-                                        onChange={(e) => setJsonForm((s) => ({ ...s, from: e.target.value }))}
-                                    />
-                                </label>
-                                <label>
-                                    To (1 email)
-                                    <input
-                                        value={jsonForm.to}
-                                        onChange={(e) => setJsonForm((s) => ({ ...s, to: e.target.value }))}
-                                    />
-                                </label>
-                            </div>
+                        <label>
+                            Password / App password
+                            <input
+                                type="password"
+                                value={mailboxForm.password}
+                                onChange={(e) =>
+                                    setMailboxForm((s) => ({ ...s, password: e.target.value }))
+                                }
+                                placeholder="••••••••••••"
+                            />
+                        </label>
 
-                            <button className="btn" disabled={jsonLoading}>
-                                {jsonLoading ? "Sending..." : "Send"}
-                            </button>
-                        </form>
+                        <label>
+                            Limit (optional, default 50)
+                            <input
+                                type="number"
+                                min="1"
+                                max="200"
+                                value={mailboxForm.limit}
+                                placeholder="50"
+                                onChange={(e) =>
+                                    setMailboxForm((s) => ({ ...s, limit: e.target.value }))
+                                }
+                            />
+                        </label>
 
-                        {jsonError && <ErrorBox err={jsonError} />}
-                        {jsonResult && <ResultBox title="Response" data={jsonResult} />}
-                        {jsonAuth && <AuthResultsCard data={jsonAuth} />}
-                    </section>
-                )}
+                        <button className="btn" disabled={mailboxLoading}>
+                            {mailboxLoading ? "Analyzing..." : "Analyze"}
+                        </button>
+                    </form>
 
-                {canEmlSingle && (
-                    <section className="card">
-                        <div className="cardTitle">Ingest EML (single)</div>
-
-                        <form onSubmit={submitEml} className="form">
-                            <label>
-                                Fișier .eml
-                                <input
-                                    type="file"
-                                    accept=".eml,message/rfc822"
-                                    onChange={(e) => setEmlFile(e.target.files?.[0] || null)}
-                                />
-                            </label>
-
-                            <button className="btn" disabled={emlLoading}>
-                                {emlLoading ? "Uploading..." : "Upload"}
-                            </button>
-                        </form>
-
-                        {emlError && <ErrorBox err={emlError} />}
-                        {emlResult && <ResultBox title="Response" data={emlResult} />}
-                        {emlAuth && <AuthResultsCard data={emlAuth} />}
-                    </section>
-                )}
+                    {mailboxError && <ErrorBox err={mailboxError} />}
+                    {mailboxResult && <ResultBox title="Analyze response" data={mailboxResult} />}
+                </section>
 
                 {canBatch && (
-                    <section className="card span2">
+                    <section className="card">
                         <div className="cardTitle">Ingest EML (batch)</div>
 
                         <form onSubmit={submitBatch} className="form">
@@ -286,7 +206,9 @@ export default function IngestionPage() {
                                     type="file"
                                     multiple
                                     accept=".eml,message/rfc822"
-                                    onChange={(e) => setBatchFiles(Array.from(e.target.files || []))}
+                                    onChange={(e) =>
+                                        setBatchFiles(Array.from(e.target.files || []))
+                                    }
                                 />
                             </label>
 
@@ -294,7 +216,10 @@ export default function IngestionPage() {
                                 Selectate: <b>{batchFiles.length}</b>
                             </div>
 
-                            <button className="btn" disabled={batchLoading || batchFiles.length === 0}>
+                            <button
+                                className="btn"
+                                disabled={batchLoading || batchFiles.length === 0}
+                            >
                                 {batchLoading ? "Uploading..." : "Upload batch"}
                             </button>
                         </form>

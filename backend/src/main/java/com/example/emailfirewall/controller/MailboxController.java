@@ -17,16 +17,31 @@ public class MailboxController {
 
     private final MailboxFetchService mailboxFetchService;
 
-    @PostMapping("/fetch")
-    public Map<String, String> fetch(@RequestBody MailboxFetchRequest req) throws Exception {
 
-        mailboxFetchService.fetchInbox(
+    @PostMapping("/analyze")
+    public Map<String, String> analyze(@RequestBody MailboxFetchRequest req) throws Exception {
+        mailboxFetchService.analyzeInbox(
                 req.host(),
                 req.username(),
                 req.password(),
                 req.limit()
         );
 
-        return Map.of("status", "FETCHED");
+        return Map.of("status", "ANALYZED");
+    }
+
+    @PostMapping("/fetch")
+    public Map<String, String> fetchAndMove(@RequestBody MailboxFetchRequest req) throws Exception {
+        int moved = mailboxFetchService.fetchAndMoveInbox(
+                req.host(),
+                req.username(),
+                req.password(),
+                req.limit()
+        );
+
+        return Map.of(
+                "status", "FETCHED_AND_MOVED",
+                "moved", String.valueOf(moved)
+        );
     }
 }

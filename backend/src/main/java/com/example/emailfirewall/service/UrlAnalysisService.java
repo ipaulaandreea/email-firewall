@@ -31,59 +31,35 @@ public class UrlAnalysisService {
     );
 
     public FirewallScanResult analyze(ParsedEmail email) {
-
         FirewallScanResult result = new FirewallScanResult();
-
         if (email == null) {
-
             return result;
-
         }
 
         String content = safe(email.bodyText) + "\n" + safe(email.bodyHtml);
-
-        // 1. URL-uri plain text din bodyText/bodyHtml
-
         Matcher urlMatcher = URL_PATTERN.matcher(content);
 
         while (urlMatcher.find()) {
-
             String raw = cleanup(urlMatcher.group(1));
-
             analyzeUrl(raw, result);
 
         }
-
-        // 2. URL-uri din href="..."
-
         Pattern hrefPattern = Pattern.compile(
 
                 "href\\s*=\\s*[\"']([^\"']+)[\"']",
 
                 Pattern.CASE_INSENSITIVE
-
         );
 
         Matcher hrefMatcher = hrefPattern.matcher(content);
-
         while (hrefMatcher.find()) {
-
             String raw = cleanup(hrefMatcher.group(1));
-
             if (raw.startsWith("http://") || raw.startsWith("https://")) {
-
                 analyzeUrl(raw, result);
-
             }
 
         }
-
-        // 3. Detectare mismatch între href și textul vizibil
-
         detectHrefMismatch(email, result);
-
-        // 4. Deduplicare linkuri după URL normalizat
-
         deduplicateLinks(result);
 
         return result;
@@ -183,9 +159,9 @@ public class UrlAnalysisService {
                         "Domeniu internaționalizat: " + unicodeHost);
             }
 
-            if (raw.length() > 180) {
-                addSignal(result, link, "VERY_LONG_URL", 15,
-                        "URL foarte lung detectat");
+            if (raw.length() > 300) {
+                addSignal(result, link, "VERY_LONG_URL", 5,
+                        "URL lung / tracking detectat");
             }
 
             if (!link.signals.isEmpty()) {
@@ -274,13 +250,12 @@ public class UrlAnalysisService {
     }
 
     private String maxVerdict(ScannedLink link) {
-        int max = link.signals.stream()
+        int total = link.signals.stream()
                 .mapToInt(FirewallFinding::scoreDelta)
-                .max()
-                .orElse(0);
+                .sum();
 
-        if (max >= 35) return "SUSPICIOUS";
-        if (max >= 15) return "WARNING";
+        if (total >= 45) return "SUSPICIOUS";
+        if (total >= 15) return "WARNING";
         return "CLEAN";
     }
 

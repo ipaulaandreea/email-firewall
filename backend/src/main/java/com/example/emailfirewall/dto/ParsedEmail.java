@@ -12,6 +12,7 @@ public class ParsedEmail {
     public String subject;
     public String bodyText;
     public String bodyHtml;
+    public String messageId;
     public Map<String, List<String>> headers = new HashMap<>();
 
     public List<AttachmentMeta> attachments = new ArrayList<>();

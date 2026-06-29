@@ -2,92 +2,171 @@ package com.example.emailfirewall.service;
 
 import com.example.emailfirewall.dto.IngestResponse;
 import com.example.emailfirewall.dto.ParsedEmail;
+import com.example.emailfirewall.enums.EmailStatus;
 import com.example.emailfirewall.enums.EmailVerdict;
 import com.example.emailfirewall.enums.IngestSource;
-import com.example.emailfirewall.service.EmailService;
-import com.example.emailfirewall.service.EmlParserService;
+import com.example.emailfirewall.repository.EmailRepository;
 import jakarta.mail.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.util.Map;
 import java.util.Properties;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
-
 @RequiredArgsConstructor
-
 public class MailboxFetchService {
 
+    private static final int DEFAULT_LIMIT = 50;
+
     private final EmlParserService emlParserService;
-
     private final EmailService emailService;
+    private final EmailRepository emailRepository;
 
-    public void fetchInbox(String host, String username, String password, Integer limit) throws Exception {
+    private final Map<String, MoveTarget> movableMessages = new ConcurrentHashMap<>();
+
+    private record MoveTarget(UUID emailId, String folder) {}
+
+    public void analyzeInbox(String host, String username, String password, Integer limit) throws Exception {
+        String appUser = currentUsername();
+
+        Store store = null;
+        Folder inbox = null;
+
+        try {
+            Session session = Session.getInstance(buildProps(host));
+            store = session.getStore("imaps");
+            store.connect(host, 993, username, password);
+
+            inbox = store.getFolder("INBOX");
+            inbox.open(Folder.READ_ONLY);
+
+            int total = inbox.getMessageCount();
+            if (total == 0) return;
+
+            int effectiveLimit = resolveLimit(limit);
+            int start = Math.max(1, total - effectiveLimit + 1);
+
+            Message[] messages = inbox.getMessages(start, total);
+
+            for (Message msg : messages) {
+                String messageId = getMessageId(msg);
+                String moveKey = moveKey(appUser, messageId);
+
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                msg.writeTo(out);
+
+                ParsedEmail parsed = emlParserService.parse(
+                        new ByteArrayInputStream(out.toByteArray())
+                );
+
+                IngestResponse response = emailService.ingestParsedEmail(parsed, IngestSource.IMAP);
+                EmailVerdict verdict = response.verdict();
+
+                if (verdict == EmailVerdict.QUARANTINE) {
+                    movableMessages.put(moveKey, new MoveTarget(response.emailId(), "Quarantine"));
+                } else if (verdict == EmailVerdict.BLOCK) {
+                    movableMessages.put(moveKey, new MoveTarget(response.emailId(), "Block"));
+                } else {
+                    movableMessages.remove(moveKey);
+                }
+            }
+        } finally {
+            if (inbox != null && inbox.isOpen()) {
+                inbox.close(false);
+            }
+            if (store != null && store.isConnected()) {
+                store.close();
+            }
+        }
+    }
+
+    public int fetchAndMoveInbox(String host, String username, String password, Integer limit) throws Exception {
+        String appUser = currentUsername();
+
+        Store store = null;
+        Folder inbox = null;
+        int moved = 0;
+
+        try {
+            Session session = Session.getInstance(buildProps(host));
+            store = session.getStore("imaps");
+            store.connect(host, 993, username, password);
+
+            inbox = store.getFolder("INBOX");
+            inbox.open(Folder.READ_WRITE);
+
+            int total = inbox.getMessageCount();
+            if (total == 0 || movableMessages.isEmpty()) return 0;
+
+            int effectiveLimit = resolveLimit(limit);
+            int start = Math.max(1, total - effectiveLimit + 1);
+
+            Message[] messages = inbox.getMessages(start, total);
+
+            for (Message msg : messages) {
+                String messageId = getMessageId(msg);
+                String moveKey = moveKey(appUser, messageId);
+
+                MoveTarget target = movableMessages.get(moveKey);
+                if (target == null) continue;
+
+                moveMessage(inbox, msg, target.folder());
+
+                emailRepository.findById(target.emailId()).ifPresent(email -> {
+                    email.setStatus(EmailStatus.QUARANTINED);
+                    email.setMailboxFolder(target.folder());
+                    emailRepository.save(email);
+                });
+
+                movableMessages.remove(moveKey);
+                moved++;
+            }
+
+            return moved;
+        } finally {
+            if (inbox != null && inbox.isOpen()) {
+                inbox.close(true);
+            }
+            if (store != null && store.isConnected()) {
+                store.close();
+            }
+        }
+    }
+
+    private Properties buildProps(String host) {
         Properties props = new Properties();
-
         props.put("mail.store.protocol", "imaps");
         props.put("mail.imaps.host", host);
         props.put("mail.imaps.port", "993");
         props.put("mail.imaps.ssl.enable", "true");
         props.put("mail.imaps.auth", "true");
+        return props;
+    }
 
-        Session session = Session.getInstance(props);
-        session.setDebug(true);
+    private int resolveLimit(Integer limit) {
+        return (limit == null || limit <= 0) ? DEFAULT_LIMIT : limit;
+    }
 
-        Store store = session.getStore("imaps");
+    private String getMessageId(Message message) throws MessagingException {
+        String[] headers = message.getHeader("Message-ID");
 
-        store.connect(
-                host,
-                993,
-                username,
-                password
-        );
-
-        Folder inbox = store.getFolder("INBOX");
-
-        inbox.open(Folder.READ_WRITE);
-
-        int total = inbox.getMessageCount();
-
-        if (total == 0) {
-            inbox.close(false);
-            store.close();
-            return;
+        if (headers != null && headers.length > 0 && headers[0] != null && !headers[0].isBlank()) {
+            return headers[0].trim();
         }
 
-        int start = Math.max(1, total - limit + 1);
-
-        Message[] messages = inbox.getMessages(start, total);
-
-        for (Message msg : messages) {
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            msg.writeTo(out);
-
-            ParsedEmail parsed = emlParserService.parse(
-                    new ByteArrayInputStream(out.toByteArray())
-            );
-
-            IngestResponse response = emailService.ingestParsedEmail(parsed, IngestSource.IMAP);
-
-            EmailVerdict verdict = response.verdict();
-
-            if (verdict == EmailVerdict.QUARANTINE) {
-                moveMessage(inbox, msg, "Quarantine");
-            } else if (verdict == EmailVerdict.BLOCK) {
-                moveMessage(inbox, msg, "Block");
-            }
-        }
-        inbox.close(false);
-        store.close();
+        return String.valueOf(message.getMessageNumber());
     }
 
     private void moveMessage(Folder sourceFolder, Message message, String targetFolderName)
             throws MessagingException {
 
         Store store = sourceFolder.getStore();
-
         Folder targetFolder = ensureFolderExists(store, targetFolderName);
 
         sourceFolder.copyMessages(new Message[]{message}, targetFolder);
@@ -97,8 +176,6 @@ public class MailboxFetchService {
                 new Flags(Flags.Flag.DELETED),
                 true
         );
-
-        sourceFolder.expunge();
     }
 
     private Folder ensureFolderExists(Store store, String folderName) throws MessagingException {
@@ -112,6 +189,20 @@ public class MailboxFetchService {
             }
         }
 
-        return store.getFolder(folderName);
+        return folder;
+    }
+
+    private String currentUsername() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+
+        if (auth == null || auth.getName() == null || auth.getName().isBlank()) {
+            return "anonymous";
+        }
+
+        return auth.getName();
+    }
+
+    private String moveKey(String appUser, String messageId) {
+        return appUser + ":" + messageId;
     }
 }

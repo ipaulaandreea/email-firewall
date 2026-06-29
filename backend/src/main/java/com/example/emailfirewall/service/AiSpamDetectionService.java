@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
@@ -21,7 +22,7 @@ public class AiSpamDetectionService {
     @Value("${ollama.url:http://localhost:11434/api/generate}")
     private String ollamaUrl;
 
-    @Value("${ollama.model:mistral:7b}")
+    @Value("${ollama.model:qwen2.5:1.5b}")
     private String model;
 
     public AiSpamResult analyze(ParsedEmail email) {
@@ -31,7 +32,13 @@ public class AiSpamDetectionService {
 
         String prompt = buildPrompt(email);
 
-        RestClient client = RestClient.builder().build();
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5000);
+        factory.setReadTimeout(30000);
+
+        RestClient client = RestClient.builder()
+                .requestFactory(factory)
+                .build();
 
         Map<String, Object> body = Map.of(
                 "model", model,
@@ -39,7 +46,9 @@ public class AiSpamDetectionService {
                 "stream", false,
                 "format", "json",
                 "options", Map.of(
-                        "temperature", 0
+                        "temperature", 0,
+                        "num_ctx", 1024,
+                        "num_predict", 64
                 )
         );
 
@@ -136,44 +145,32 @@ public class AiSpamDetectionService {
     }
 
     private String buildPrompt(ParsedEmail email) {
+        String textBody = truncate(safe(email.bodyText), 800);
+
         return """
-                You are an email security classifier used inside an email firewall.
+            You are an email security classifier.
 
-                Classify the email as exactly one of:
-                BENIGN, MARKETING, SPAM, PHISHING, SCAM, MALWARE, UNKNOWN.
+            Classify this email as exactly one of:
+            BENIGN, MARKETING, SPAM, PHISHING, SCAM, MALWARE, UNKNOWN.
 
-                Rules:
-                - Prize winning, reward claims, urgent rewards, requests for card data, passwords, login verification, or personal data are suspicious.
-                - If the email asks for card data, password, login, account verification, or sensitive personal information, classify as PHISHING or SCAM.
-                - If the email uses urgency, unrealistic rewards, or pressure tactics, increase spamScore.
-                - Return ONLY valid JSON.
-                - Do not write markdown.
-                - Do not write explanations outside JSON.
-                - Your response must start with { and end with }.
+            Return ONLY valid JSON:
+            {
+              "spamScore": 0,
+              "classification": "BENIGN",
+              "confidence": "LOW",
+              "reasons": [],
+              "explanation": ""
+            }
 
-                JSON schema:
-                {
-                  "spamScore": 0,
-                  "classification": "BENIGN",
-                  "confidence": "LOW",
-                  "reasons": [],
-                  "explanation": ""
-                }
-
-                Email:
-                From: %s
-                Subject: %s
-
-                Text body:
-                %s
-
-                HTML body:
-                %s
-                """.formatted(
+            Email:
+            From: %s
+            Subject: %s
+            Body:
+            %s
+            """.formatted(
                 safe(email.from),
                 safe(email.subject),
-                truncate(safe(email.bodyText), 4000),
-                truncate(safe(email.bodyHtml), 4000)
+                textBody
         );
     }
 

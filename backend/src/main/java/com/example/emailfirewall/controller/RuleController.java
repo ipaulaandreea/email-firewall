@@ -39,7 +39,7 @@ public class RuleController {
         RuleEntity r = new RuleEntity();
         applyRequest(r, req);
         if (r.getEnabled() == null) r.setEnabled(true);
-        if (r.getPriority() == null) r.setPriority(100);
+        r.setPriority(100);
 
         RuleEntity saved = ruleRepository.save(r);
         return ResponseEntity.ok(toResponse(saved));

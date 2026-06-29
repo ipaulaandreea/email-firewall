@@ -15,6 +15,27 @@ import java.util.UUID;
 @Entity
 @Table(name = "emails")
 public class EmailEntity {
+    @Column(name = "owner_username", nullable = false, length = 320)
+    private String ownerUsername;
+
+    public String getOwnerUsername() {
+        return ownerUsername;
+    }
+
+    public void setOwnerUsername(String ownerUsername) {
+        this.ownerUsername = ownerUsername;
+    }
+
+    @Column(name = "dedupe_key", nullable = false, unique = true, length = 128)
+    private String dedupeKey;
+
+    public String getDedupeKey() {
+        return dedupeKey;
+    }
+
+    public void setDedupeKey(String dedupeKey) {
+        this.dedupeKey = dedupeKey;
+    }
 
     @Id
     @Column(nullable = false, updatable = false)

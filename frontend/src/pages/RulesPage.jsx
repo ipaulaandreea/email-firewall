@@ -131,13 +131,31 @@ export default function RulesPage() {
         setForm((prev) => ({ ...prev, ...p }));
     }
 
+    function validateRule(f) {
+        if (!f.name?.trim()) return "Name este obligatoriu.";
+        if (!f.target) return "Target este obligatoriu.";
+        if (!f.action) return "Action este obligatoriu.";
+        if (!f.pattern?.trim()) return "Pattern este obligatoriu.";
+        if (!f.priority || Number(f.priority) < 1) return "Priority trebuie să fie minim 1.";
+
+        if (f.action === "ADD_SCORE" && (f.scoreDelta === "" || f.scoreDelta === null || f.scoreDelta === undefined)) {
+            return "Score Delta este obligatoriu pentru ADD_SCORE.";
+        }
+
+        if (f.action === "SET_VERDICT" && !f.verdict) {
+            return "Verdict este obligatoriu pentru SET_VERDICT.";
+        }
+
+        return null;
+    }
+
     function normalizeBeforeSend(f) {
         const payload = {
             name: (f.name ?? "").trim(),
             target: f.target,
             action: f.action,
             pattern: f.pattern ?? "",
-            priority: Number.isFinite(+f.priority) ? +f.priority : 100,
+            priority: 100,
             enabled: !!f.enabled,
             scoreDelta: null,
             verdict: null,
@@ -159,6 +177,9 @@ export default function RulesPage() {
 
         try {
             if (!canManage) throw new Error("Nu ai permisiuni pentru a modifica reguli.");
+
+            const validationError = validateRule(form);
+            if (validationError) throw new Error(validationError);
 
             const payload = normalizeBeforeSend(form);
 

@@ -1,0 +1,26 @@
+From: "Promo Prize" <winner@promo-prize-alert.com>
+To: user@example.com
+Subject: FELICITARI!!! Ai castigat un voucher de 5000 EUR
+Date: Mon, 29 Jun 2026 10:00:00 +0300
+Message-ID: <phishing-prize-001@example.test>
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="boundary-prize-001"
+Authentication-Results: mx.example.com; spf=fail smtp.mailfrom=promo-prize-alert.com; dkim=fail; dmarc=fail header.from=promo-prize-alert.com
+
+--boundary-prize-001
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: 7bit
+
+FELICITARI!!! Ai castigat un voucher de 5000 EUR.
+Pentru revendicare, acceseaza urgent linkul de mai jos si introdu datele cardului pentru verificare.
+Oferta expira in 30 de minute.
+
+https://promo-prize-alert.com/claim?token=abc123
+
+--boundary-prize-001
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: 7bit
+
+<html><body><h1>FELICITARI!!!</h1><p>Ai castigat un voucher de 5000 EUR.</p><p>Introdu datele cardului pentru verificare.</p><a href="https://promo-prize-alert.com/claim?token=abc123">Claim now</a></body></html>
+
+--boundary-prize-001--
