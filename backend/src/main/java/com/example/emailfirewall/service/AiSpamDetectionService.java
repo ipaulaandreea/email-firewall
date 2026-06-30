@@ -4,20 +4,22 @@ import com.example.emailfirewall.dto.AiSpamResult;
 import com.example.emailfirewall.dto.ParsedEmail;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @Service
-@RequiredArgsConstructor
 public class AiSpamDetectionService {
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
+    private final RestClient client;
 
     @Value("${ollama.url:http://localhost:11434/api/generate}")
     private String ollamaUrl;
@@ -25,20 +27,42 @@ public class AiSpamDetectionService {
     @Value("${ollama.model:qwen2.5:1.5b}")
     private String model;
 
-    public AiSpamResult analyze(ParsedEmail email) {
-        if (email == null) {
-            return new AiSpamResult(0, "UNKNOWN", "LOW", List.of(), "No email content");
-        }
-
-        String prompt = buildPrompt(email);
+    public AiSpamDetectionService(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
 
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(5000);
         factory.setReadTimeout(30000);
 
-        RestClient client = RestClient.builder()
+        this.client = RestClient.builder()
                 .requestFactory(factory)
                 .build();
+    }
+
+    public AiSpamResult analyze(ParsedEmail email) {
+        if (email == null) {
+            return new AiSpamResult(0, "UNKNOWN", "LOW", List.of(), "No email content");
+        }
+
+        AiSpamResult localResult = localRuleAnalyze(email);
+
+        if (!isAmbiguous(localResult)) {
+            log.info(
+                    "Local spam rules were enough: classification={} score={}",
+                    localResult.classification(),
+                    localResult.spamScore()
+            );
+
+            return localResult;
+        }
+
+        log.info(
+                "Local spam result is ambiguous, calling LLM: classification={} score={}",
+                localResult.classification(),
+                localResult.spamScore()
+        );
+
+        String prompt = buildPrompt(email);
 
         Map<String, Object> body = Map.of(
                 "model", model,
@@ -47,8 +71,9 @@ public class AiSpamDetectionService {
                 "format", "json",
                 "options", Map.of(
                         "temperature", 0,
-                        "num_ctx", 1024,
-                        "num_predict", 200
+                        "num_ctx", 4096,
+                        "num_predict", 300,
+                        "think", false
                 )
         );
 
@@ -63,36 +88,208 @@ public class AiSpamDetectionService {
 
             String text = root.path("response").asText();
 
+            if (text == null || text.isBlank()) {
+                text = root.path("thinking").asText();
+            }
+
             JsonNode json = objectMapper.readTree(text);
 
-            String classification =
-                    json.path("classification")
-                            .asText("UNKNOWN")
-                            .toUpperCase();
+            String classification = normalizeClassification(
+                    json.path("classification").asText("UNKNOWN")
+            );
 
-            int score =
-                    json.path("spamScore")
-                            .asInt(0);
-
+            int score = json.path("spamScore").asInt(0);
             score = normalizeAiScore(classification, score);
+
+            String confidence = normalizeConfidence(
+                    json.path("confidence").asText("LOW")
+            );
+
+            List<String> reasons = readReasons(json);
+
+            log.info(
+                    "AI classification={} score={} confidence={}",
+                    classification,
+                    score,
+                    confidence
+            );
 
             return new AiSpamResult(
                     score,
                     classification,
-                    json.path("confidence").asText("LOW"),
-                    objectMapper.convertValue(
-                            json.path("reasons"),
-                            objectMapper.getTypeFactory()
-                                    .constructCollectionType(List.class, String.class)
-                    ),
+                    confidence,
+                    reasons,
                     json.path("explanation").asText("")
             );
 
         } catch (Exception e) {
-            e.printStackTrace();
-            return fallbackAnalyze(email, e);
+            log.warn("LLM unavailable or invalid response. Using local rule result.", e);
+            return localResult;
         }
     }
+
+    private AiSpamResult localRuleAnalyze(ParsedEmail email) {
+        String text = (
+                safe(email.from) + " " +
+                        safe(email.subject) + " " +
+                        safe(email.bodyText)
+        ).toLowerCase();
+
+        int score = 0;
+        List<String> reasons = new ArrayList<>();
+
+        if (containsAny(text,
+                "felicitari",
+                "felicitări",
+                "ai castigat",
+                "ai câștigat",
+                "premiu",
+                "voucher",
+                "cadou gratuit")) {
+            score += 35;
+            reasons.add("Prize or giveaway language detected");
+        }
+
+        if (containsAny(text,
+                "urgent",
+                "expira",
+                "expiră",
+                "30 de minute",
+                "imediat",
+                "acum",
+                "ultimul avertisment")) {
+            score += 20;
+            reasons.add("Urgency pressure detected");
+        }
+
+        if (containsAny(text,
+                "datele cardului",
+                "cardului",
+                "parola",
+                "parolă",
+                "password",
+                "login",
+                "autentificare",
+                "cod otp",
+                "cod de verificare")) {
+            score += 35;
+            reasons.add("Sensitive information or login request detected");
+        }
+
+        if (containsAny(text,
+                "verificare",
+                "verify",
+                "account",
+                "contul tau",
+                "contul tău",
+                "suspendat",
+                "restrictionat",
+                "restricționat")) {
+            score += 15;
+            reasons.add("Account verification or restriction wording detected");
+        }
+
+        if (containsAny(text,
+                "factura",
+                "factură",
+                "invoice",
+                "plata",
+                "plată",
+                "payment",
+                "restanta",
+                "restanță",
+                "overdue",
+                "transfer bancar",
+                "iban")) {
+            score += 30;
+            reasons.add("Payment or invoice request detected");
+        }
+
+        if (containsAny(text,
+                ".exe",
+                ".scr",
+                ".bat",
+                ".cmd",
+                ".js",
+                ".vbs",
+                ".zip",
+                ".rar")) {
+            score += 30;
+            reasons.add("Potentially risky attachment or file reference detected");
+        }
+
+        score = Math.min(score, 100);
+
+        String classification =
+                score >= 90 ? "MALWARE" :
+                        score >= 80 ? "PHISHING" :
+                                score >= 60 ? "SCAM" :
+                                        score >= 40 ? "SPAM" :
+                                                "BENIGN";
+
+        score = normalizeAiScore(classification, score);
+
+        return new AiSpamResult(
+                score,
+                classification,
+                score >= 60 ? "HIGH" : score >= 20 ? "MEDIUM" : "LOW",
+                reasons,
+                "Local rule-based spam analysis"
+        );
+    }
+
+    private boolean isAmbiguous(AiSpamResult result) {
+        if (result == null) return true;
+
+        int score = result.spamScore() != null ? result.spamScore() : 0;
+        String classification = result.classification() != null
+                ? result.classification()
+                : "UNKNOWN";
+
+        if (score == 0 && "UNKNOWN".equalsIgnoreCase(classification)) {
+            return false;
+        }
+
+        if (score >= 60) {
+            return false;
+        }
+
+        return score >= 20;
+    }
+
+    private String normalizeClassification(String value) {
+        if (value == null) return "UNKNOWN";
+
+        return switch (value.trim().toUpperCase()) {
+            case "BENIGN", "MARKETING", "SPAM", "PHISHING", "SCAM", "MALWARE", "UNKNOWN" ->
+                    value.trim().toUpperCase();
+            default -> "UNKNOWN";
+        };
+    }
+
+    private String normalizeConfidence(String value) {
+        if (value == null) return "LOW";
+
+        return switch (value.trim().toUpperCase()) {
+            case "LOW", "MEDIUM", "HIGH" -> value.trim().toUpperCase();
+            default -> "LOW";
+        };
+    }
+
+    private List<String> readReasons(JsonNode json) {
+        JsonNode reasonsNode = json.path("reasons");
+
+        if (!reasonsNode.isArray()) {
+            return List.of();
+        }
+
+        return objectMapper.convertValue(
+                reasonsNode,
+                objectMapper.getTypeFactory()
+                        .constructCollectionType(List.class, String.class)
+        );
+    }
+
     private int normalizeAiScore(String classification, int score) {
         if (classification == null) return 0;
 
@@ -113,126 +310,50 @@ public class AiSpamDetectionService {
     private int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
     }
-    private AiSpamResult fallbackAnalyze(ParsedEmail email, Exception e) {
-        String text = (
-                safe(email.from) + " " +
-                        safe(email.subject) + " " +
-                        safe(email.bodyText)
-        ).toLowerCase();
-
-        int score = 0;
-        List<String> reasons = new java.util.ArrayList<>();
-
-        if (text.contains("felicitari")
-                || text.contains("ai castigat")
-                || text.contains("premiu")
-                || text.contains("voucher")) {
-            score += 35;
-            reasons.add("Prize/giveaway language detected");
-        }
-
-        if (text.contains("urgent")
-                || text.contains("expira")
-                || text.contains("30 de minute")
-                || text.contains("imediat")) {
-            score += 20;
-            reasons.add("Urgency pressure detected");
-        }
-
-        if (text.contains("datele cardului")
-                || text.contains("cardului")
-                || text.contains("parola")
-                || text.contains("password")
-                || text.contains("login")) {
-            score += 35;
-            reasons.add("Sensitive information or login request detected");
-        }
-
-        if (text.contains("verificare")
-                || text.contains("verify")
-                || text.contains("account")) {
-            score += 15;
-            reasons.add("Account verification wording detected");
-        }
-
-        if (text.contains("factura")
-                || text.contains("invoice")
-                || text.contains("plata")
-                || text.contains("payment")
-                || text.contains("restanta")
-                || text.contains("overdue")) {
-            score += 30;
-            reasons.add("Payment or invoice request detected");
-        }
-
-        score = Math.min(score, 100);
-
-        String classification =
-                score >= 80 ? "PHISHING" :
-                        score >= 60 ? "SCAM" :
-                                score >= 40 ? "SPAM" :
-                                        "UNKNOWN";
-        score = normalizeAiScore(classification, score);
-        return new AiSpamResult(
-                score,
-                classification,
-                "MEDIUM",
-                reasons,
-                "Local LLM unavailable or invalid response. Fallback classifier used. Cause: "
-                        + e.getClass().getSimpleName()
-        );
-    }
 
     private String buildPrompt(ParsedEmail email) {
-        String textBody = truncate(safe(email.bodyText), 800);
+        String textBody = truncate(safe(email.bodyText), 1500);
 
         return """
-            You are an email security classifier.
-
-            Classify the email as exactly one of:
+            Classify this email as one of:
             BENIGN, MARKETING, SPAM, PHISHING, SCAM, MALWARE, UNKNOWN.
+            Romanian and English emails are supported.
 
-            Classification rules:
-            - BENIGN = legitimate personal or business communication.
-            - MARKETING = legitimate newsletters, promotions, ecommerce campaigns, job alerts, or brand offers.
-            - SPAM = unsolicited bulk messages or aggressive advertising.
-            - PHISHING = credential theft, fake login pages, impersonation, account verification, passwords, card data, or personal data requests.
-            - SCAM = fraud, fake rewards, payment manipulation, overdue invoice pressure, bank transfer requests, urgency attacks.
-            - MALWARE = suspicious executable or malicious attachment/link delivery.
-            - UNKNOWN = insufficient content or unclear intent. Use UNKNOWN only if no better class applies.
+            Rules:
+            BENIGN: normal personal/business email.
+            MARKETING: legitimate promotion/newsletter/job alert.
+            SPAM: unsolicited advertising.
+            PHISHING: login/password/card/OTP/personal data request.
+            SCAM: fake prize, fraud, payment pressure, bank transfer.
+            MALWARE: suspicious attachment/link/file.
 
-            Scoring guide:
-            - 0-20: benign, marketing, normal automated notification, or insufficient evidence
-            - 21-40: mildly suspicious marketing/spam
-            - 41-60: spam or suspicious promotion
-            - 61-80: scam or phishing indicators
-            - 81-100: strong phishing, malware, credential theft, card/payment request, or urgent fraud
-
-            Important:
-            - Normal newsletters, ecommerce promotions, job alerts, and brand offers must be MARKETING, not PHISHING.
-            - Payment requests, unpaid invoices, overdue balances, bank transfers, and payment confirmations increase spamScore significantly.
-            - Prize/reward claims, unrealistic offers, urgency, pressure tactics, login/password/card requests increase spamScore.
-            - Return ONLY valid JSON. No markdown. No extra text.
-
-            Required JSON schema:
+            Return only JSON:
             {
               "spamScore": 0,
               "classification": "BENIGN",
               "confidence": "LOW",
-              "reasons": [],
-              "explanation": ""
+              "reasons": ["reason1","reason2"],
+              "explanation": "short explanation"
             }
 
             Email:
             From: %s
             Subject: %s
-            Body:
-            %s
+            Body: %s
             """.formatted(
                 safe(email.from),
                 safe(email.subject),
                 textBody
         );
+    }
+
+    private boolean containsAny(String text, String... keywords) {
+        for (String keyword : keywords) {
+            if (text.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String safe(String s) {
