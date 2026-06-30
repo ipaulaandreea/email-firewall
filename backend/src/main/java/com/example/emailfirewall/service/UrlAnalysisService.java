@@ -122,6 +122,13 @@ public class UrlAnalysisService {
             default -> 0;
         };
     }
+    private boolean isTrustedTracker(String host) {
+        if (host == null) return false;
+
+        return host.endsWith("mailersend.net")
+                || host.endsWith("sendgrid.net")
+                || host.endsWith("mailchimp.com");
+    }
 
     private void analyzeUrl(String raw, FirewallScanResult result) {
         ScannedLink link = new ScannedLink();
@@ -155,13 +162,12 @@ public class UrlAnalysisService {
 
             String unicodeHost = IDN.toUnicode(host);
             if (!unicodeHost.equals(host)) {
-                addSignal(result, link, "IDN_DOMAIN", 20,
-                        "Domeniu internaționalizat: " + unicodeHost);
-            }
-
-            if (raw.length() > 300) {
-                addSignal(result, link, "VERY_LONG_URL", 5,
-                        "URL lung / tracking detectat");
+                link.signals.add(new FirewallFinding(
+                        "URL",
+                        "IDN_DOMAIN_INFO",
+                        0,
+                        "Internationalized domain detected: " + unicodeHost
+                ));
             }
 
             if (!link.signals.isEmpty()) {
@@ -171,8 +177,17 @@ public class UrlAnalysisService {
             result.addLink(link);
 
         } catch (Exception e) {
-            result.addFinding("URL", "MALFORMED_URL", 20,
-                    "URL invalid sau malformat: " + raw);
+            ScannedLink newScannedLink = new ScannedLink();
+            newScannedLink.urlRaw = raw;
+            newScannedLink.urlNormalized = raw;
+            newScannedLink.verdict = "CLEAN";
+            newScannedLink.signals.add(new FirewallFinding(
+                    "URL",
+                    "MALFORMED_URL_INFO",
+                    0,
+                    "Malformed URL ignored: " + raw
+            ));
+            result.addLink(newScannedLink);
         }
     }
 
@@ -197,6 +212,9 @@ public class UrlAnalysisService {
 
             try {
                 String hrefHost = URI.create(href).getHost();
+                if (isTrustedTracker(hrefHost)) {
+                    continue;
+                }
                 String visibleHost = URI.create(visibleUrl).getHost();
 
                 if (hrefHost != null

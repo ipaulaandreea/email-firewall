@@ -69,9 +69,9 @@ public class MailboxFetchService {
                 EmailVerdict verdict = response.verdict();
 
                 if (verdict == EmailVerdict.QUARANTINE) {
-                    movableMessages.put(moveKey, new MoveTarget(response.emailId(), "Quarantine"));
+                    movableMessages.put(moveKey, new MoveTarget(response.emailId(), "Quarantined"));
                 } else if (verdict == EmailVerdict.BLOCK) {
-                    movableMessages.put(moveKey, new MoveTarget(response.emailId(), "Block"));
+                    movableMessages.put(moveKey, new MoveTarget(response.emailId(), "Blocked"));
                 } else {
                     movableMessages.remove(moveKey);
                 }
@@ -96,6 +96,8 @@ public class MailboxFetchService {
         try {
             Session session = Session.getInstance(buildProps(host));
             store = session.getStore("imaps");
+            ensureFolderExists(store, "Quarantine");
+            ensureFolderExists(store, "Block");
             store.connect(host, 993, username, password);
 
             inbox = store.getFolder("INBOX");
@@ -165,12 +167,9 @@ public class MailboxFetchService {
 
     private void moveMessage(Folder sourceFolder, Message message, String targetFolderName)
             throws MessagingException {
-
         Store store = sourceFolder.getStore();
         Folder targetFolder = ensureFolderExists(store, targetFolderName);
-
         sourceFolder.copyMessages(new Message[]{message}, targetFolder);
-
         sourceFolder.setFlags(
                 new Message[]{message},
                 new Flags(Flags.Flag.DELETED),
@@ -181,15 +180,34 @@ public class MailboxFetchService {
     private Folder ensureFolderExists(Store store, String folderName) throws MessagingException {
         Folder folder = store.getFolder(folderName);
 
-        if (!folder.exists()) {
-            boolean created = folder.create(Folder.HOLDS_MESSAGES);
+        if (folder.exists()) {
+            return folder;
+        }
 
-            if (!created) {
-                throw new MessagingException("Could not create mailbox folder: " + folderName);
+        boolean created = folder.create(Folder.HOLDS_MESSAGES);
+
+        if (!created) {
+            throw new MessagingException("Could not create Gmail label: " + folderName);
+        }
+
+        folder.setSubscribed(true);
+
+        for (int i = 0; i < 10; i++) {
+            Folder refreshed = store.getFolder(folderName);
+
+            if (refreshed.exists()) {
+                return refreshed;
+            }
+
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new MessagingException("Interrupted while waiting for Gmail label creation", e);
             }
         }
 
-        return folder;
+        throw new MessagingException("Gmail label was created but is not visible yet: " + folderName);
     }
 
     private String currentUsername() {
