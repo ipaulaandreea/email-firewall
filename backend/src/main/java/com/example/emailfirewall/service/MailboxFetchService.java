@@ -69,9 +69,9 @@ public class MailboxFetchService {
                 EmailVerdict verdict = response.verdict();
 
                 if (verdict == EmailVerdict.QUARANTINE) {
-                    movableMessages.put(moveKey, new MoveTarget(response.emailId(), "Quarantined"));
+                    movableMessages.put(moveKey, new MoveTarget(response.emailId(), "Quarantine"));
                 } else if (verdict == EmailVerdict.BLOCK) {
-                    movableMessages.put(moveKey, new MoveTarget(response.emailId(), "Blocked"));
+                    movableMessages.put(moveKey, new MoveTarget(response.emailId(), "Block"));
                 } else {
                     movableMessages.remove(moveKey);
                 }
@@ -87,8 +87,6 @@ public class MailboxFetchService {
     }
 
     public int fetchAndMoveInbox(String host, String username, String password, Integer limit) throws Exception {
-        String appUser = currentUsername();
-
         Store store = null;
         Folder inbox = null;
         int moved = 0;
@@ -96,38 +94,58 @@ public class MailboxFetchService {
         try {
             Session session = Session.getInstance(buildProps(host));
             store = session.getStore("imaps");
+            store.connect(host, 993, username, password);
             ensureFolderExists(store, "Quarantine");
             ensureFolderExists(store, "Block");
-            store.connect(host, 993, username, password);
 
             inbox = store.getFolder("INBOX");
             inbox.open(Folder.READ_WRITE);
 
             int total = inbox.getMessageCount();
-            if (total == 0 || movableMessages.isEmpty()) return 0;
+            if (total == 0) return 0;
 
             int effectiveLimit = resolveLimit(limit);
             int start = Math.max(1, total - effectiveLimit + 1);
 
             Message[] messages = inbox.getMessages(start, total);
 
+            // Process each message: analyze and move if needed
             for (Message msg : messages) {
-                String messageId = getMessageId(msg);
-                String moveKey = moveKey(appUser, messageId);
+                try {
+                    ByteArrayOutputStream out = new ByteArrayOutputStream();
+                    msg.writeTo(out);
 
-                MoveTarget target = movableMessages.get(moveKey);
-                if (target == null) continue;
+                    ParsedEmail parsed = emlParserService.parse(
+                            new ByteArrayInputStream(out.toByteArray())
+                    );
 
-                moveMessage(inbox, msg, target.folder());
+                    IngestResponse response = emailService.ingestParsedEmail(parsed, IngestSource.IMAP);
+                    EmailVerdict verdict = response.verdict();
 
-                emailRepository.findById(target.emailId()).ifPresent(email -> {
-                    email.setStatus(EmailStatus.QUARANTINED);
-                    email.setMailboxFolder(target.folder());
-                    emailRepository.save(email);
-                });
+                    // Move message if verdict is QUARANTINE or BLOCK
+                    if (verdict == EmailVerdict.QUARANTINE) {
+                        moveMessage(inbox, msg, "Quarantine");
 
-                movableMessages.remove(moveKey);
-                moved++;
+                        emailRepository.findById(response.emailId()).ifPresent(email -> {
+                            email.setStatus(EmailStatus.QUARANTINED);
+                            email.setMailboxFolder("Quarantine");
+                            emailRepository.save(email);
+                        });
+                        moved++;
+                    } else if (verdict == EmailVerdict.BLOCK) {
+                        moveMessage(inbox, msg, "Block");
+
+                        emailRepository.findById(response.emailId()).ifPresent(email -> {
+                            email.setStatus(EmailStatus.QUARANTINED);
+                            email.setMailboxFolder("Block");
+                            emailRepository.save(email);
+                        });
+                        moved++;
+                    }
+                } catch (Exception e) {
+                    System.err.println("Error processing message: " + e.getMessage());
+                    // Continue with next message instead of failing completely
+                }
             }
 
             return moved;
@@ -169,12 +187,20 @@ public class MailboxFetchService {
             throws MessagingException {
         Store store = sourceFolder.getStore();
         Folder targetFolder = ensureFolderExists(store, targetFolderName);
-        sourceFolder.copyMessages(new Message[]{message}, targetFolder);
-        sourceFolder.setFlags(
-                new Message[]{message},
-                new Flags(Flags.Flag.DELETED),
-                true
-        );
+
+        try {
+            // Copy message to target folder
+            sourceFolder.copyMessages(new Message[]{message}, targetFolder);
+
+            // Mark as deleted in source folder
+            message.setFlag(Flags.Flag.DELETED, true);
+
+            // Expunge deleted messages
+            sourceFolder.expunge();
+        } catch (MessagingException e) {
+            // If move fails, log but don't crash - the email is still in inbox but marked in DB
+            throw new MessagingException("Failed to move message to " + targetFolderName + ": " + e.getMessage(), e);
+        }
     }
 
     private Folder ensureFolderExists(Store store, String folderName) throws MessagingException {
