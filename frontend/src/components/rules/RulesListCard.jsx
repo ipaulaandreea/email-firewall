@@ -18,12 +18,6 @@ export default function RulesListCard({
                     <button className="btn btnGhost" onClick={onRefresh} disabled={loading}>
                         Refresh
                     </button>
-
-                    {canManage && (
-                        <button className="btn" onClick={onNew}>
-                            + New Rule
-                        </button>
-                    )}
                 </div>
             </div>
 

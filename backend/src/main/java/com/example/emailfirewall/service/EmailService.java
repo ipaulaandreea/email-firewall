@@ -87,8 +87,12 @@ public class EmailService {
         FirewallScanResult attachmentResult = attachmentAnalysisService.analyze(p);
         extraScore += extraSecurityScore(attachmentResult);
         persistAttachments(email, p);
-
+        System.out.println("RULE SCORE = " + eval.getTotalScore());
+        System.out.println("AUTH SCORE = " + authScore);
+        System.out.println("URL SCORE = " + extraSecurityScore(urlResult));
+        System.out.println("ATTACHMENT SCORE = " + extraSecurityScore(attachmentResult));
         int score = eval.getTotalScore() + authScore + extraScore;
+        score = Math.min(score, 100);
         EmailVerdict forcedVerdict =
                 eval.isBypassTriggered() ? null : eval.getForcedVerdict();
 
@@ -129,19 +133,21 @@ public class EmailService {
         AiSpamResult ai = aiSpamDetectionService.analyze(parsed);
 
         int currentScore = email.getThreatScore() != null ? email.getThreatScore() : 0;
-        int aiRawScore = ai.spamScore() != null ? ai.spamScore() : 0;
+        int previousAiScore = email.getAiSpamScore() != null ? email.getAiSpamScore() : 0;
 
+        int baseScoreWithoutAi = Math.max(0, currentScore - previousAiScore);
+
+        int aiRawScore = ai.spamScore() != null ? ai.spamScore() : 0;
         int aiPartialScore = calculateAiContribution(aiRawScore);
-        int newScore = currentScore + aiPartialScore;
+
+        int newScore = baseScoreWithoutAi + aiPartialScore;
 
         email.setAiSpamScore(aiPartialScore);
         email.setAiClassification(ai.classification());
         email.setAiExplanation(ai.explanation());
 
-        EmailVerdict newVerdict = determineVerdict(newScore, null);
-
         email.setThreatScore(newScore);
-        email.setVerdict(newVerdict);
+        email.setVerdict(determineVerdict(newScore, null));
 
         EmailEntity saved = emailRepository.save(email);
         return buildIngestResponse(saved);
